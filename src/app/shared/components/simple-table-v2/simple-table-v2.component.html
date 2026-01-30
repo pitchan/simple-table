@@ -15,18 +15,18 @@
   </div>
 
   <!-- Table -->
-  <div class="table-wrapper" [class.sticky-header]="config?.stickyHeader">
+  <div class="table-wrapper" [class.sticky-header]="config.stickyHeader">
     <table 
       mat-table 
       [dataSource]="tableData" 
       matSort
-      [matSortDisabled]="config?.features?.sort === false"
+      [matSortDisabled]="config.features?.sort === false"
       (matSortChange)="onSortChangeEvent($event)"
       class="simple-table-v2"
-      [class.responsive]="config?.responsive">
+      [class.responsive]="config.responsive">
 
       <!-- Selection Column -->
-      <ng-container matColumnDef="select" *ngIf="selection && config?.features?.selection !== false">
+      <ng-container matColumnDef="select" *ngIf="selection && config.features?.selection !== false">
         <th mat-header-cell *matHeaderCellDef [class.sticky-column]="true" class="select-column">
           <mat-checkbox
             (change)="$event ? masterToggle() : null"
@@ -53,7 +53,7 @@
           mat-header-cell 
           *matHeaderCellDef 
           [mat-sort-header]="column.id"
-          [disabled]="column.sortable === false"
+          [disabled]="column.sortable === false || resizeActiveBlocker"
           [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
           [class.sticky-column-end]="column.sticky === 'end'"
           [class.resizable-header]="column.resizable !== false"
@@ -138,7 +138,7 @@
       </ng-container> -->
 
       <!-- Header Row -->
-      <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: config?.stickyHeader"></tr>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: config.stickyHeader"></tr>
 
       <!-- Body Row -->
       <tr 
@@ -166,7 +166,7 @@
   </mat-menu> -->
 
   <!-- Table Footer with Actions and Paginator -->
-  <div class="table-footer-container" *ngIf="config?.features?.pagination !== false">
+  <div class="table-footer-container" *ngIf="config.features?.pagination !== false">
     <!-- Table Actions (left side) -->
     <div class="table-actions">
       <div class="button-group">
@@ -177,8 +177,8 @@
     <!-- Paginator (right side) -->
     <mat-paginator
       [length]="totalCount"
-      [pageSize]="config?.defaultPageSize ?? 1000"
-      [pageSizeOptions]="config?.pageSizeOptions ?? [100, 200, 500, 1000, 2000, 5000]"
+      [pageSize]="config.defaultPageSize ?? 1000"
+      [pageSizeOptions]="config.pageSizeOptions ?? [100, 200, 500, 1000, 2000, 5000]"
       [showFirstLastButtons]="true"
       (page)="onPageChangeEvent($event)">
     </mat-paginator>

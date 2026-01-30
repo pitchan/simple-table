@@ -7,12 +7,15 @@ import {
   EventEmitter,
   HostBinding,
   Input,
+  OnChanges,
   OnInit,
   Output,
   Renderer2,
+  SimpleChanges,
   ViewChild,
   inject,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
@@ -79,9 +82,12 @@ import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS } from './models/col
     TranslateModule,
   ],
 })
-export class SimpleTableV2Component<T> implements OnInit, AfterViewInit {
+export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewInit {
   private cdr = inject(ChangeDetectorRef);
   private destroyRef = inject(DestroyRef);
+
+  /** Flag to track if AfterViewInit has been called */
+  private viewInitialized = false;
 
   // ========== INPUTS ==========
   /** Data source - can be an array, DataSource, or FilterableDataSource */
@@ -122,22 +128,13 @@ export class SimpleTableV2Component<T> implements OnInit, AfterViewInit {
   // ========== STRATEGY (internal) ==========
   private strategy!: ITableStrategy<T>;
 
-  // ========== PUBLIC GETTERS (expose strategy signals) ==========
-  get tableData(): T[] {
-    const data = this.strategy?.data() ?? [];
-    if (this.debug) {
-      console.log('[SimpleTableV2] tableData accessed:', data.length);
-    }
-    return data;
-  }
-
-  get totalCount(): number {
-    return this.strategy?.totalCount() ?? 0;
-  }
-
-  get isLoading(): boolean {
-    return this.strategy?.loading() ?? false;
-  }
+  // ========== PUBLIC STATE (synced from strategy) ==========
+  /** Current page data - updated only when strategy emits */
+  tableData: T[] = [];
+  /** Total count for paginator - updated only when strategy emits */
+  totalCount = 0;
+  /** Loading state - updated only when strategy emits */
+  isLoading = false;
 
   // ========== DISPLAY STATE ==========
   displayedColumns: string[] = [];
@@ -150,6 +147,9 @@ export class SimpleTableV2Component<T> implements OnInit, AfterViewInit {
   private startX = 0;
   private startWidth = 0;
   private renderer = inject(Renderer2);
+  
+  /** Bloque temporairement le tri pendant/après un resize pour éviter les clics parasites */
+  resizeActiveBlocker = false;
 
   // Dynamic CSS custom properties for column widths
   @HostBinding('style') get hostStyles(): Record<string, string> {
@@ -162,9 +162,36 @@ export class SimpleTableV2Component<T> implements OnInit, AfterViewInit {
 
   // ========== LIFECYCLE ==========
   ngOnInit(): void {
+    if (this.debug) {
+      console.group('[SimpleTableV2] Initialization');
+      console.log('Config:', this.config);
+      console.log('Data Type:', this.data?.constructor?.name);
+    }
+
     this.validateInputs();
     this.initializeColumns();
     this.initializeStrategy();
+
+    if (this.debug) {
+      console.groupEnd();
+    }
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Handle data changes AFTER AfterViewInit
+    // Before AfterViewInit, data is initialized in ngAfterViewInit()
+    if (changes['data'] && this.viewInitialized && this.strategy) {
+      const newData = changes['data'].currentValue;
+      
+      if (this.debug) {
+        console.log('[SimpleTableV2] Data changed after init, reinitializing strategy', newData);
+      }
+      
+      // Reinitialize strategy with new data
+      this.strategy.initialize(newData);
+      // Sync state immediately for instant UI update
+      this.syncFromStrategy();
+    }
   }
 
   ngAfterViewInit(): void {
@@ -172,19 +199,33 @@ export class SimpleTableV2Component<T> implements OnInit, AfterViewInit {
     // 1. Attach sort and paginator FIRST
     // 2. Initialize data SECOND (so combineLatest has all observables)
     // 3. Connect LAST (to subscribe to the data stream)
+    
+    if (this.debug) {
+      console.group('[SimpleTableV2] View Init');
+      console.log('Sort present:', !!this.sort);
+      console.log('Paginator present:', !!this.paginator);
+    }
+
     this.attachPaginatorAndSort();
     this.strategy.initialize(this.data);
     this.connectStrategy();
+    this.viewInitialized = true;
     this.cdr.markForCheck();
+
+    if (this.debug) {
+      console.groupEnd();
+    }
   }
 
   // ========== INITIALIZATION ==========
   private validateInputs(): void {
     if (!this.data) {
-      console.error('[SimpleTableV2] No data provided');
+      console.error('[SimpleTableV2] ❌ CRITICAL: No data provided to [data] input');
     }
     if (!this.config) {
-      console.error('[SimpleTableV2] No config provided');
+      console.error('[SimpleTableV2] ❌ CRITICAL: No config provided to [config] input');
+    } else if (!this.config.columns || this.config.columns.length === 0) {
+      console.warn('[SimpleTableV2] ⚠️ WARNING: Config provided but "columns" array is empty. Table will be empty.');
     }
   }
 
@@ -257,11 +298,31 @@ export class SimpleTableV2Component<T> implements OnInit, AfterViewInit {
   }
 
   private connectStrategy(): void {
-    this.strategy.connect().subscribe();
+    this.strategy.connect().pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(() => {
+      this.syncFromStrategy();
+    });
 
     if (this.debug) {
       console.log('[SimpleTableV2] Strategy connected');
     }
+  }
+
+  /**
+   * Synchronize component state from strategy signals.
+   * Called only when strategy emits new data (not on every change detection cycle).
+   */
+  private syncFromStrategy(): void {
+    this.tableData = this.strategy.data();
+    this.totalCount = this.strategy.totalCount();
+    this.isLoading = this.strategy.loading();
+
+    if (this.debug) {
+      console.log('[SimpleTableV2] Data synced:', this.tableData.length);
+    }
+
+    this.cdr.markForCheck();
   }
 
   // ========== EVENT HANDLERS ==========
@@ -423,6 +484,7 @@ export class SimpleTableV2Component<T> implements OnInit, AfterViewInit {
     event.stopPropagation();
 
     this.resizing = true;
+    this.resizeActiveBlocker = true;
     this.resizingColumn = columnId;
     this.startX = event.pageX;
     
@@ -474,6 +536,12 @@ export class SimpleTableV2Component<T> implements OnInit, AfterViewInit {
       }
       
       this.resizingColumn = null;
+      
+      // Délai pour absorber le click parasite qui survient après mouseup
+      setTimeout(() => {
+        this.resizeActiveBlocker = false;
+        this.cdr.markForCheck();
+      }, 200);
     }
   };
 }
