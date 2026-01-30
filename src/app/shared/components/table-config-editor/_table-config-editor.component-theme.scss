@@ -1,0 +1,28 @@
+@use "sass:map";
+@use "@angular/material" as mat;
+
+@mixin theme($theme) {
+  /* retrieve variables from theme */
+  /* (all possible variables, use only what you really need) */
+  $background: map.get($theme, background);
+
+  .options-editor{
+
+    background-color: map.get($background, background);
+    color: map.get($background, default-contrast);
+
+    .column-group mat-expansion-panel{
+      background-color: map.get($background, background);
+      color: map.get($background, default-contrast);
+    }
+    
+    .column-item{
+      background-color: transparent;
+    }
+
+  }
+
+  
+
+
+}

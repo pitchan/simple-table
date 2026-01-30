@@ -1,0 +1,136 @@
+.options-editor {
+    max-width: 100%;
+    padding: 0 15px;
+    display: inline-block;
+    vertical-align: top;
+
+    .table-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        margin-top: 10px;
+    }
+
+    .mat-mdc-mini-fab {
+        border-radius: 5px !important;
+    }
+
+    .toggle-options {
+        margin: 10px 0px 0px 10px;
+        display: flex;
+        justify-content: flex-end;
+        & > * {
+            margin-bottom: 10px;
+        }
+        .label-container {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 10px 0;
+
+            .value-label {
+                font-weight: 600;
+            }
+        }
+
+        mat-icon {
+            cursor: pointer;
+        }
+    }
+
+    .column-list {
+        border: solid 1px #ccc;
+        min-height: 60px;
+        border-radius: 4px;
+        display: block;
+        overflow: hidden;
+    }
+
+    .column-item:last-child {
+        border: none;
+    }
+
+    .mat-expansion-panel {
+        max-width: 600px;
+    }
+}
+
+// this class must be declared out of its parent as it is used by the cdkDrag element
+.column-item {
+    padding: 0px 10px; /* Adjusted padding to move items to the left */
+    min-width: 500px;
+    display: flex;
+    border-bottom: solid 1px #ccc;
+    box-sizing: border-box;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap;
+
+    .drag-handler {
+        cursor: move;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        align-items: center;
+        width: calc(100% - 50px);
+
+        span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    }
+
+    .colunm-attributes {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: center;
+        align-items: center;
+        width: 50px;
+
+        button {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            margin-left: -14px;
+        }
+
+        button:first-child {
+            margin-left: 0; 
+        }
+    }
+
+    &.sticky {
+        position: sticky;
+        left: 0;
+        z-index: 100;
+    }
+
+    &.sticky + .sticky {
+        left: auto;
+    }
+}
+
+/* Highlight the list item that is being dragged. */
+.cdk-drag-preview {
+    box-sizing: border-box;
+    border-radius: 4px;
+    box-shadow: 0 5px 5px -3px rgba(0, 0, 0, 0.2), 0 8px 10px 1px rgba(0, 0, 0, 0.14), 0 3px 14px 2px rgba(0, 0, 0, 0.12);
+}
+
+.cdk-drag-placeholder {
+    opacity: 0;
+}
+
+/* Animate an item that has been dropped. */
+.cdk-drag-animating {
+    transition: transform 300ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* Animate items as they're being sorted. */
+.column-item.cdk-drop-list-dragging .cdk-drag {
+    transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}

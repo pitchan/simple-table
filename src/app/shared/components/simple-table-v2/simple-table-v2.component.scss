@@ -1,0 +1,297 @@
+.simple-table-v2-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  // Loading overlay
+  .loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  &.loading {
+    pointer-events: none;
+  }
+}
+
+.table-wrapper {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+
+  &.sticky-header {
+    max-height: calc(100vh - 250px);
+  }
+}
+
+.simple-table-v2 {
+  width: 100%;
+  background: white;
+
+  // Selection column (checkbox) - fixed narrow width
+  .select-column {
+    width: 26px;
+    min-width: 26px;
+    max-width: 26px;
+    padding: 0 8px;
+    text-align: center;
+  }
+
+  // Config column - fixed narrow width at the end
+  .config-column {
+    width: 26px;
+    min-width: 26px;
+    max-width: 26px;
+    padding: 0 8px;
+    text-align: center;
+  }
+
+  // Header styling
+  th.mat-mdc-header-cell {
+    background: #f5f5f5;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.87);
+    border-bottom: 2px solid #e0e0e0;
+    padding: 12px 16px;
+    position: relative;
+    overflow: visible;
+    
+    .header-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    // Resizable header with handle
+    &.resizable-header {
+      user-select: none;
+      
+      .resize-handle {
+        position: absolute;
+        top: 0;
+        right: -6px; // Centrer sur le bord droit (la moitié de width)
+        bottom: 0;
+        width: 12px; // Zone de hit de 12px (6px de chaque côté du bord)
+        height: 100%;
+        cursor: col-resize;
+        z-index: 100;
+        display: block;
+
+        // Visual indicator (ligne verticale sur le bord droit de la colonne)
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 50%; // Centrer la ligne dans la zone de hit
+          transform: translateX(-50%);
+          width: 2px;
+          background-color: rgba(0, 0, 0, 0.12);
+          transition: all 0.2s ease;
+        }
+
+        &:hover::before {
+          background-color: #1976d2;
+          width: 3px;
+          box-shadow: 0 0 4px rgba(25, 118, 210, 0.4);
+        }
+
+        &:active::before {
+          background-color: #1565c0;
+          width: 4px;
+          box-shadow: 0 0 6px rgba(21, 101, 192, 0.6);
+        }
+      }
+    }
+  }
+
+  // Body cell styling
+  td.mat-cell {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    
+    .cell-content {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+      &.badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #e3f2fd;
+        color: #1976d2;
+        font-size: 12px;
+        font-weight: 500;
+      }
+    }
+
+    .cell-link {
+      color: #1976d2;
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.2s;
+
+      &:hover {
+        color: #1565c0;
+        text-decoration: underline;
+      }
+    }
+  }
+
+  // Sticky columns
+  .sticky-column {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: inherit;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 1px;
+      background: #e0e0e0;
+    }
+  }
+
+  .sticky-column-end {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: inherit;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 1px;
+      background: #e0e0e0;
+    }
+  }
+
+  // Row styling
+  .table-row {
+    transition: background-color 0.2s;
+
+    &.clickable {
+      cursor: pointer;
+
+      &:hover {
+        background: #f5f5f5;
+      }
+    }
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  // Responsive mode
+  &.responsive {
+    @media (max-width: 768px) {
+      th.mat-header-cell,
+      td.mat-cell {
+        padding: 8px 12px;
+        font-size: 14px;
+      }
+    }
+  }
+}
+
+// Table footer with actions and paginator
+.table-footer-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+  padding:12px 16px;
+
+  .table-actions {
+    flex: 1;
+    display: flex;
+    align-items: center;
+
+    .button-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+  }
+
+  mat-paginator {
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+  }
+
+  // Responsive: stack on small screens
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 16px;
+
+    .table-actions {
+      .button-group {
+        justify-content: flex-start;
+      }
+    }
+
+    mat-paginator {
+      width: 100%;
+    }
+  }
+}
+
+// Sort header arrow alignment
+::ng-deep {
+  .mat-sort-header-arrow {
+    margin-left: 4px;
+  }
+}
+
+// Table config menu styling
+.table-config-menu {
+  max-width: 400px;
+  
+  .config-menu-wrapper {
+    padding: 0;
+    max-height: 600px;
+    overflow-y: auto;
+    
+    // Override table-config-editor styles for better UX
+    app-table-config-editor {
+      display: block;
+      min-width: 350px;
+    }
+  }
+}
+
+// Config menu backdrop styling (global)
+::ng-deep {
+  .cdk-overlay-pane.table-config-menu {
+    .mat-mdc-menu-panel {
+      max-width: none !important;
+      min-width: 380px;
+    }
+  }
+}

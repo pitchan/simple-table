@@ -1,0 +1,14 @@
+<div class="test-table-container">
+  <h2>Test Composant Simple Table V2</h2>
+  <p>Ce composant démontre l'utilisation de <code>simple-table-v2</code> avec des données statiques.</p>
+  
+  <div class="table-wrapper mat-elevation-z8">
+    <app-simple-table-v2
+      [data]="users"
+      [config]="tableConfig"
+      [debug]="true"
+      (rowClick)="onRowClick($event)"
+      (hyperlinkClick)="onHyperlinkClick($event)">
+    </app-simple-table-v2>
+  </div>
+</div>

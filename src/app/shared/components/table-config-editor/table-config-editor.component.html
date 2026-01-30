@@ -1,0 +1,122 @@
+<div class="options-editor mat-body">
+    <div *ngIf="tableColumnDefaultConfig?.isGeneric">
+        <section class="toggle-options">
+            <mat-slide-toggle *ngIf="hasResponsiveOption" [(ngModel)]="options.responsive"
+                (click)="prevent($event)">responsive</mat-slide-toggle>
+            <mat-icon (click)="saveTableConfig()">save</mat-icon>
+        </section>
+        <p>
+            <ng-container [ngSwitch]="tableColumnDefaultConfig?.displayMode">
+                <span *ngSwitchCase="DISPLAY_MODE_SINGLE">
+                    {{'PAGES.GENERIC_DICTIONARY.SEARCH.FILTER.DISPLAY_MODE_SINGLE' | translate}}
+                </span>
+                <span *ngSwitchCase="DISPLAY_MODE_MAPPING">
+                    {{'PAGES.GENERIC_DICTIONARY.SEARCH.FILTER.DISPLAY_MODE_MAPPING' | translate}}
+                </span>
+                <span *ngSwitchCase="DISPLAY_MODE_HIERARCHY">
+                    {{'PAGES.GENERIC_DICTIONARY.SEARCH.FILTER.DISPLAY_MODE_HIERACHY' | translate}}
+                </span>
+            </ng-container>
+            {{'PAGES.GENERIC_DICTIONARY.SEARCH.FILTER.DISPLAY_MODE' | translate}} -
+            {{tableColumnDefaultConfig?.structure}} -
+            <ng-container [ngSwitch]="tableColumnDefaultConfig?.showFamilyValue">
+                <span *ngSwitchCase="true">{{'PAGES.GENERIC_DICTIONARY.SEARCH.FILTER.SHOW_FAMILY_AND_VALUE' |
+                    translate}}</span>
+                <span *ngSwitchCase="false">{{'PAGES.GENERIC_DICTIONARY.SEARCH.FILTER.SHOW_FAMILY' | translate}}</span>
+            </ng-container>
+        </p>
+    </div>
+    <div class="table-header">
+        <span *ngIf="tableColumnDefaultConfig?.title">{{ tableColumnDefaultConfig?.title | translate }}</span>
+        <button color="primary" (click)="fitWidth()" mat-mini-fab aria-label="fitWidth">
+            <mat-icon>horizontal_distribute</mat-icon>
+        </button>
+    </div>
+    <div>
+        <div cdkDropList [cdkDropListData]="options.columns.columns" [cdkDropListSortPredicate]="sortPredicate"
+            (cdkDropListDropped)="drop($event)">
+            <ng-container *ngIf="options.columns.groups.length == 1">
+                <ng-container *ngFor="let group of options.columns.groups; first as isFirst">
+                    <div class="column-list">
+                        <ng-container *ngFor="let c of options.columns.columns">
+                            <div class="column-item" [cdkDragData]="c" cdkDrag [hidden]="true"
+                                *ngIf="c.selector || c.isExpansionPanel">
+                                <div class cdkDragHandle class="drag-handler">
+                                    <mat-icon>drag_indicator</mat-icon>
+                                    <span title="{{ c.i18n | translate }}">{{ c.i18n | translate }}</span>
+                                </div>
+                                <div class="colunm-attributes">
+                                    <button *ngIf="hasLockOption" mat-icon-button (click)="toggleSticky($event, c)">
+                                        <mat-icon *ngIf="c.sticky">lock</mat-icon>
+                                        <mat-icon *ngIf="!c.sticky">lock_open</mat-icon>
+                                    </button>
+                                    <button mat-icon-button (click)="toggleVisibility($event, c)"
+                                        [disabled]="c?.isTree">
+                                        <mat-icon *ngIf="c.hidden">visibility_off</mat-icon>
+                                        <mat-icon *ngIf="!c.hidden">visibility</mat-icon>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="column-item" [cdkDragData]="c" cdkDrag
+                                *ngIf="c.group === group && c.name != 'expanded' && !c.selector && !c.isExpansionPanel"
+                                [ngClass]="{'sticky': c.sticky}">
+                                <div class cdkDragHandle class="drag-handler">
+                                    <mat-icon>drag_indicator</mat-icon>
+                                    <span title="{{ c.i18n | translate }}">{{ c.i18n | translate }}</span>
+                                </div>
+                                <div class="colunm-attributes">
+                                    <button *ngIf="hasLockOption" mat-icon-button (click)="toggleSticky($event, c)">
+                                        <mat-icon *ngIf="c.sticky">lock</mat-icon>
+                                        <mat-icon *ngIf="!c.sticky">lock_open</mat-icon>
+                                    </button>
+                                    <button mat-icon-button (click)="toggleVisibility($event, c)"
+                                        [disabled]="c?.isTree">
+                                        <mat-icon *ngIf="c.hidden">visibility_off</mat-icon>
+                                        <mat-icon *ngIf="!c.hidden">visibility</mat-icon>
+                                    </button>
+                                </div>
+                            </div>
+                        </ng-container>
+                    </div>
+                </ng-container>
+            </ng-container>
+            <ng-container *ngIf="options.columns.groups.length > 1">
+                <mat-accordion class="column-group">
+                    <ng-container *ngFor="let group of options.columns.groups; first as isFirst">
+                        <mat-expansion-panel *ngIf="group" [expanded]="options.columns.groups.length == 1 && isFirst">
+                            <mat-expansion-panel-header (click)="$event.stopPropagation()">
+                                <mat-panel-title>
+                                    {{ 'PAGES.GENERIC_DICTIONARY.SEARCH.TABLE_CONFIG.GROUP.' + group | translate}}
+                                </mat-panel-title>
+                            </mat-expansion-panel-header>
+                            <div class="column-list">
+                                <ng-container *ngFor="let c of options.columns.columns">
+                                    <div class="column-item" [cdkDragData]="c" cdkDrag
+                                        *ngIf="c.group === group && c.name != 'expanded'"
+                                        [ngClass]="{'sticky': c.sticky}">
+                                        <div class cdkDragHandle class="drag-handler">
+                                            <mat-icon>drag_indicator</mat-icon>
+                                            <span title="{{ c.i18n | translate }}"> {{ c.i18n | translate }}</span>
+                                        </div>
+                                        <div class="colunm-attributes">
+                                            <button *ngIf="hasLockOption" mat-icon-button
+                                                (click)="toggleSticky($event, c)">
+                                                <mat-icon *ngIf="c.sticky">lock</mat-icon>
+                                                <mat-icon *ngIf="!c.sticky">lock_open</mat-icon>
+                                            </button>
+                                            <button mat-icon-button
+                                                (click)="$event.stopPropagation(); toggleVisibility($event, c)">
+                                                <mat-icon *ngIf="c.hidden">visibility_off</mat-icon>
+                                                <mat-icon *ngIf="!c.hidden">visibility</mat-icon>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </ng-container>
+                            </div>
+                        </mat-expansion-panel>
+                    </ng-container>
+                </mat-accordion>
+            </ng-container>
+        </div>
+    </div>
+</div>
