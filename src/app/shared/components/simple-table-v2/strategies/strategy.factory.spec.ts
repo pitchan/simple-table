@@ -6,6 +6,7 @@ import { FilterableDataSourceStrategy } from './filterable-datasource.strategy';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { MatPaginator } from '@angular/material/paginator';
 import { DataSource } from '@angular/cdk/collections';
+import { BehaviorSubject } from 'rxjs';
 
 describe('TableStrategyFactory', () => {
   let mockDestroyRef: DestroyRef;
@@ -34,14 +35,15 @@ describe('TableStrategyFactory', () => {
 
   it('should create FilterableDataSourceStrategy for FilterableDataSource', () => {
     // Create mock FilterableDataSource with required properties
+    // Using modelsSubject (BehaviorSubject) as in the real implementation
     const mockFilterableDataSource = {
       paginator: null,
       sort: null,
-      length$: {},
-      dataToRender$: {},
-      loading$: {},
+      length$: new BehaviorSubject(0).asObservable(),
+      modelsSubject: new BehaviorSubject([]),
+      loading$: new BehaviorSubject(false).asObservable(),
       loadPage: () => {},
-      connect: () => {},
+      connect: () => new BehaviorSubject([]).asObservable(),
       disconnect: () => {},
     } as unknown as FilterableDataSource<any, unknown, MatPaginator>;
 
@@ -91,10 +93,11 @@ describe('TableStrategyFactory', () => {
 
   describe('Type Guards', () => {
     it('should correctly identify FilterableDataSource', () => {
+      // Use modelsSubject instead of dataToRender$
       const mockFilterable = {
         paginator: {},
         length$: {},
-        dataToRender$: {},
+        modelsSubject: new BehaviorSubject([]),
         loading$: {},
         loadPage: () => {},
       };
@@ -107,10 +110,12 @@ describe('TableStrategyFactory', () => {
       const notFilterable1 = { connect: () => {} };
       const notFilterable2 = { paginator: {} }; // Missing other properties
       const notFilterable3 = null;
+      const notFilterable4 = { paginator: {}, length$: {}, loading$: {} }; // Missing modelsSubject and loadPage
 
       expect((TableStrategyFactory as any).isFilterableDataSource(notFilterable1)).toBe(false);
       expect((TableStrategyFactory as any).isFilterableDataSource(notFilterable2)).toBe(false);
       expect((TableStrategyFactory as any).isFilterableDataSource(notFilterable3)).toBe(false);
+      expect((TableStrategyFactory as any).isFilterableDataSource(notFilterable4)).toBe(false);
     });
 
     it('should correctly identify DataSource', () => {

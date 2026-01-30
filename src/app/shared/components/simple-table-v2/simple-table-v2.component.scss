@@ -37,6 +37,9 @@
 .simple-table-v2 {
   width: 100%;
   background: white;
+  // IMPORTANT: Force les colonnes à respecter les largeurs définies
+  // Sans cela, le contenu nowrap peut forcer les colonnes à s'élargir
+  table-layout: fixed;
 
   // Selection column (checkbox) - fixed narrow width
   .select-column {
@@ -64,7 +67,7 @@
     border-bottom: 2px solid #e0e0e0;
     padding: 12px 16px;
     position: relative;
-    overflow: visible;
+    overflow: visible; // Nécessaire pour le resize-handle qui dépasse
     
     .header-label {
       display: inline-flex;
@@ -119,6 +122,9 @@
   td.mat-cell {
     padding: 12px 16px;
     border-bottom: 1px solid #e0e0e0;
+    // Force respect des largeurs définies malgré le contenu nowrap
+    overflow: hidden;
+    text-overflow: ellipsis;
     
     .cell-content {
       display: block;

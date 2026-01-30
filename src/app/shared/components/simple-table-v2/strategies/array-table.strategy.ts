@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort } from '@angular/material/sort';
-import { Observable, tap } from 'rxjs';
+import { Observable, distinctUntilChanged, tap } from 'rxjs';
 import { ITableStrategy, StrategyConfig } from '../models/table-strategy.interface';
 
 /**
@@ -33,6 +33,13 @@ export class ArrayTableStrategy<T> implements ITableStrategy<T> {
 
   /**
    * Initialize with array data
+   * 
+   * IMPORTANT: This method can be called multiple times:
+   * 1. First call in ngAfterViewInit() after paginator/sort are attached
+   * 2. Subsequent calls from ngOnChanges() when data input changes
+   * 
+   * We synchronize _data immediately for instant UI update, then the
+   * MatTableDataSource observable will update _data with paginated results.
    */
   initialize(data: T[]): void {
     if (!Array.isArray(data)) {
@@ -40,8 +47,17 @@ export class ArrayTableStrategy<T> implements ITableStrategy<T> {
       return;
     }
 
+    // Update MatTableDataSource
     this.dataSource.data = data;
+    
+    // Synchronize signals immediately for instant UI update
+    // This ensures tableData reflects the new data even before
+    // MatTableDataSource emits through connect()
     this._totalCount.set(data.length);
+    this._data.set(data);
+    
+    // Trigger change detection
+    this.cdr.markForCheck();
 
     // Apply custom sorting accessor if provided
     if (this.config?.sortingDataAccessor) {
@@ -66,8 +82,10 @@ export class ArrayTableStrategy<T> implements ITableStrategy<T> {
    */
   connect(): Observable<T[]> {
     // Subscribe to MatTableDataSource changes
+    // distinctUntilChanged() filters redundant emissions (e.g., from DOM events like mouseup)
     return this.dataSource.connect().pipe(
       takeUntilDestroyed(this.destroyRef),
+      distinctUntilChanged(),
       tap(data => {
         this._data.set(data);
         this.cdr.markForCheck();

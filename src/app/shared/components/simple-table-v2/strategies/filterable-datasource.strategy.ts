@@ -2,7 +2,7 @@ import { signal, computed, DestroyRef, ChangeDetectorRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort } from '@angular/material/sort';
-import { Observable, tap } from 'rxjs';
+import { Observable, distinctUntilChanged, tap } from 'rxjs';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { ITableStrategy } from '../models/table-strategy.interface';
 
@@ -12,6 +12,14 @@ import { ITableStrategy } from '../models/table-strategy.interface';
  * 
  * CRITICAL: This strategy preserves existing FilterableDataSource behavior
  * used by 20+ components across the application.
+ * 
+ * Data flow:
+ * 1. Component calls filterSubject.next(filter)
+ * 2. FilterableDataSource.updateChangeSubscription() detects change
+ * 3. FilterableDataSource.loadPage() calls load()
+ * 4. Subclass load() calls HTTP service and pushes data to modelsSubject
+ * 5. This strategy subscribes to modelsSubject and updates signals
+ * 6. SimpleTableV2 renders data from signals
  */
 export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
   private dataSource!: FilterableDataSource<T, unknown, MatPaginator>;
@@ -46,7 +54,6 @@ export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
 
   /**
    * Connect and bridge FilterableDataSource observables to signals
-   * Replicates tvsItemSize directive behavior from TableTreeView
    * 
    * IMPORTANT: Must be called AFTER attachPaginator() and attachSort()
    */
@@ -56,13 +63,22 @@ export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
       return new Observable(subscriber => subscriber.complete());
     }
 
-    // CRITICAL: Bridge dataToRender$ → dataOfRange$
-    // This replicates the tvsItemSize directive behavior that triggers connect() emission
-    this.dataSource.dataToRender$
-      .pipe(takeUntilDestroyed(this.destroyRef))
+    // Check if filter has been initialized (common pitfall)
+    const currentFilter = this.dataSource.filterSubject.getValue();
+    if (currentFilter === null) {
+      console.warn('[FilterableDataSourceStrategy] ⚠️ WARNING: FilterableDataSource filter is NULL. Data will NOT load until filterSubject.next() is called.');
+    }
+
+    // Subscribe to modelsSubject for data updates
+    // This is the main data stream from FilterableDataSource
+    // distinctUntilChanged() filters redundant emissions
+    this.dataSource.modelsSubject
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        distinctUntilChanged()
+      )
       .subscribe((data) => {
-        this.dataSource.dataOfRange$.next(data as T[]);
-        this._data.set(data as T[]);
+        this._data.set(data);
         this.cdr.markForCheck();
       });
 
@@ -83,11 +99,13 @@ export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
       });
 
     // Return connect() stream for change detection
-    // This triggers when dataOfRange$ emits (after our bridge above)
+    // FilterableDataSource.connect() returns modelsSubject.asObservable()
+    // distinctUntilChanged() filters redundant emissions
     return this.dataSource.connect().pipe(
       takeUntilDestroyed(this.destroyRef),
+      distinctUntilChanged(),
       tap(() => this.cdr.markForCheck())
-    );
+    ) as Observable<T[]>;
   }
 
   /**

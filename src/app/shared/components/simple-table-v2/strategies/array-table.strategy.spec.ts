@@ -21,7 +21,7 @@ describe('ArrayTableStrategy', () => {
     expect(strategy).toBeTruthy();
   });
 
-  it('should initialize with array data', () => {
+  it('should initialize with array data and synchronize signals immediately', () => {
     const testData = [
       { id: 1, name: 'Item 1' },
       { id: 2, name: 'Item 2' },
@@ -29,7 +29,18 @@ describe('ArrayTableStrategy', () => {
 
     strategy.initialize(testData);
 
+    // Verify signals are synchronized immediately (no need for connect())
     expect(strategy.totalCount()).toBe(2);
+    expect(strategy.data()).toEqual(testData);
+    expect(strategy.data().length).toBe(2);
+  });
+
+  it('should call markForCheck when initializing data', () => {
+    const testData = [{ id: 1 }];
+    
+    strategy.initialize(testData);
+    
+    expect(mockCdr.markForCheck).toHaveBeenCalled();
   });
 
   it('should handle empty array', () => {
@@ -131,5 +142,29 @@ describe('ArrayTableStrategy', () => {
     strategy.refresh();
 
     expect(strategy.totalCount()).toBe(2);
+  });
+
+  it('should handle re-initialization with new data (async data updates)', () => {
+    // First initialization with empty array
+    strategy.initialize([]);
+    expect(strategy.data()).toEqual([]);
+    expect(strategy.totalCount()).toBe(0);
+    
+    // Reset spy to track new calls
+    mockCdr.markForCheck.calls.reset();
+    
+    // Re-initialize with new data (simulating async data arrival)
+    const asyncData = [
+      { id: 1, name: 'Async Item 1' },
+      { id: 2, name: 'Async Item 2' },
+      { id: 3, name: 'Async Item 3' },
+    ];
+    
+    strategy.initialize(asyncData);
+    
+    // Verify signals are updated immediately
+    expect(strategy.data()).toEqual(asyncData);
+    expect(strategy.totalCount()).toBe(3);
+    expect(mockCdr.markForCheck).toHaveBeenCalled();
   });
 });

@@ -54,7 +54,10 @@ export class TableStrategyFactory {
 
   /**
    * Type guard for FilterableDataSource
-   * Checks for distinctive properties: paginator, length$, dataToRender$
+   * Checks for distinctive properties: paginator, length$, modelsSubject, loading$
+   * 
+   * NOTE: We check for modelsSubject (BehaviorSubject) which is the main data stream
+   * in FilterableDataSource. This is the correct property to check, not dataToRender$.
    */
   private static isFilterableDataSource<T>(
     data: unknown
@@ -66,10 +69,11 @@ export class TableStrategyFactory {
     const obj = data as any;
 
     // FilterableDataSource has these distinctive properties
+    // modelsSubject is the public BehaviorSubject that contains the data
     return (
       'paginator' in obj &&
       'length$' in obj &&
-      'dataToRender$' in obj &&
+      'modelsSubject' in obj &&
       'loading$' in obj &&
       'loadPage' in obj &&
       typeof obj.loadPage === 'function'
