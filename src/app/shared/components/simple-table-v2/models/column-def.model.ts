@@ -165,12 +165,12 @@ export interface TableConfig<T = any> {
  */
 export const DEFAULT_COLUMN_WIDTHS: Record<string, { min: number; max: number; initial: number }> = {
   text: { min: 120, max: 420, initial: 200 },
-  date: { min: 120, max: 180, initial: 140 },
+  date: { min: 90, max: 180, initial: 90 },
   number: { min: 90, max: 160, initial: 110 },
   badge: { min: 100, max: 200, initial: 120 },
-  link: { min: 100, max: 300, initial: 150 },
+  link: { min: 100, max: 420, initial: 150 },
   button: { min: 60, max: 120, initial: 80 },
   selector: { min: 48, max: 48, initial: 48 },
-  editable: { min: 120, max: 420, initial: 200 },
+  editable: { min: 120, max: 200, initial: 200 },
   custom: { min: 100, max: 400, initial: 150 },
 };

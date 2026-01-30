@@ -268,13 +268,6 @@
   }
 }
 
-// Sort header arrow alignment
-::ng-deep {
-  .mat-sort-header-arrow {
-    margin-left: 4px;
-  }
-}
-
 // Table config menu styling
 .table-config-menu {
   max-width: 400px;
@@ -288,16 +281,6 @@
     app-table-config-editor {
       display: block;
       min-width: 350px;
-    }
-  }
-}
-
-// Config menu backdrop styling (global)
-::ng-deep {
-  .cdk-overlay-pane.table-config-menu {
-    .mat-mdc-menu-panel {
-      max-width: none !important;
-      min-width: 380px;
     }
   }
 }

@@ -68,7 +68,6 @@ export class TestTableComponent {
         sortable: true,
         sticky: 'start',
         accessor: (row) => row.name,
-        width: { initial: 200, min: 100, max: 400 }
       },
       {
         id: 'email',
@@ -76,7 +75,6 @@ export class TestTableComponent {
         type: 'text',
         sortable: true,
         accessor: (row) => row.email,
-        width: { initial: 250, min: 150, max: 400 }
       },
       {
         id: 'role',
@@ -84,7 +82,6 @@ export class TestTableComponent {
         type: 'badge', // Test du type badge
         sortable: true,
         accessor: (row) => row.role,
-        width: { initial: 120, min: 80, max: 200 }
       },
       {
         id: 'status',
@@ -93,7 +90,6 @@ export class TestTableComponent {
         sortable: true,
         accessor: (row) => row.status,
         formatter: (value) => value === 'active' ? 'Actif' : 'Inactif',
-        width: { initial: 100, min: 80, max: 150 }
       },
       {
         id: 'lastLogin',
@@ -103,7 +99,6 @@ export class TestTableComponent {
         accessor: (row) => row.lastLogin,
         sortAccessor: (row) => row.lastLogin.getTime(),
         formatter: (value: Date) => value.toLocaleDateString('fr-FR'),
-        width: { initial: 150, min: 120, max: 200 }
       },
       {
         id: 'actions',
@@ -111,7 +106,6 @@ export class TestTableComponent {
         type: 'button',
         sortable: false,
         sticky: 'end',
-        width: { initial: 100, min: 80, max: 150 },
         actions: [
           {
             kind: 'button',
