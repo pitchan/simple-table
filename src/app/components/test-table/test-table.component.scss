@@ -10,6 +10,16 @@
     margin-bottom: 24px;
     color: #666;
   }
+
+  .loading-message {
+    font-style: italic;
+    color: #666;
+  }
+
+  .error-message {
+    color: #c62828;
+    font-weight: 500;
+  }
 }
 
 .table-wrapper {

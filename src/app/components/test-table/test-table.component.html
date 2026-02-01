@@ -1,8 +1,10 @@
 <div class="test-table-container">
   <h2>Test Composant Simple Table V2</h2>
-  <p>Ce composant démontre l'utilisation de <code>simple-table-v2</code> avec des données statiques.</p>
-  
-  <div class="table-wrapper mat-elevation-z8">
+  <p>Ce composant démontre l'utilisation de <code>simple-table-v2</code> avec des données simulées venant d’un «&nbsp;serveur&nbsp;» (délai 1,5&nbsp;s).</p>
+
+  <p *ngIf="loading" class="loading-message">Chargement en cours…</p>
+  <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
+  <div *ngIf="!loading && !errorMessage" class="table-wrapper mat-elevation-z8">
     <app-simple-table-v2
       [data]="users"
       [config]="tableConfig"

@@ -53,7 +53,7 @@
           mat-header-cell 
           *matHeaderCellDef 
           [mat-sort-header]="column.id"
-          [disabled]="column.sortable === false || resizeActiveBlocker"
+          [disabled]="column.sortable === false || isResizing"
           [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
           [class.sticky-column-end]="column.sticky === 'end'"
           [class.resizable-header]="column.resizable !== false"
@@ -64,11 +64,18 @@
             {{ getColumnHeader(column) | translate }}
           </span>
           
-          <!-- Resize Handle -->
+          <!-- Resize Handle (V2: Pointer Events, CSS var on host, emit only on end) -->
           <span 
             *ngIf="column.resizable !== false"
             class="resize-handle"
-            (mousedown)="onResizeStart($event, column.id)">
+            columnResize
+            [columnId]="column.id"
+            [minWidth]="getMinWidth(column.id)"
+            [maxWidth]="getMaxWidth(column.id)"
+            [initialWidth]="getInitialWidth(column.id)"
+            [debug]="debug"
+            (resizeStart)="onResizeStart($event)"
+            (resizeEnd)="onResizeEnd($event)">
           </span>
         </th>
 

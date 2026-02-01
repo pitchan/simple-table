@@ -10,7 +10,6 @@ import {
   OnChanges,
   OnInit,
   Output,
-  Renderer2,
   SimpleChanges,
   ViewChild,
   inject,
@@ -33,6 +32,7 @@ import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sour
 import { TableStrategyFactory } from './strategies/strategy.factory';
 import { ITableStrategy } from './models/table-strategy.interface';
 import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS } from './models/column-def.model';
+import { ColumnResizeDirective, ColumnResizeEvent } from './directives/column-resize.directive';
 
 /**
  * SimpleTableV2Component - Refactored with Strategy Pattern
@@ -80,6 +80,7 @@ import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS } from './models/col
     MatMenuModule,
     MatProgressSpinnerModule,
     TranslateModule,
+    ColumnResizeDirective,
   ],
 })
 export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewInit {
@@ -121,6 +122,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   /** Page change event (for external handling) */
   @Output() pageChange = new EventEmitter<PageEvent>();
 
+  /** Column width change event (for localStorage persistence) */
+  @Output() columnWidthChange = new EventEmitter<ColumnResizeEvent>();
+
   // ========== VIEW CHILDREN ==========
   @ViewChild(MatSort) sort!: MatSort;
   @ViewChild(MatPaginator) paginator!: MatPaginator;
@@ -141,15 +145,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   visibleColumns: TableColumnDef<T>[] = [];
   columnWidths = new Map<string, number>();
 
-  // ========== COLUMN RESIZE ==========
-  private resizing = false;
-  private resizingColumn: string | null = null;
-  private startX = 0;
-  private startWidth = 0;
-  private renderer = inject(Renderer2);
-  
-  /** Bloque temporairement le tri pendant/après un resize pour éviter les clics parasites */
-  resizeActiveBlocker = false;
+  // ========== COLUMN RESIZE STATE ==========
+  /** Flag to block sort during resize (no setTimeout needed) */
+  isResizing = false;
 
   // Dynamic CSS custom properties for column widths
   @HostBinding('style') get hostStyles(): Record<string, string> {
@@ -472,76 +470,65 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     };
   }
 
-  // ========== COLUMN RESIZE METHODS ==========
+  // ========== COLUMN RESIZE HANDLERS ==========
   
   /**
-   * Start column resize
-   * @param event Mouse event
-   * @param columnId Column identifier
+   * Handle resize start from directive
+   * Sets isResizing flag to disable sort during drag
    */
-  onResizeStart(event: MouseEvent, columnId: string): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    this.resizing = true;
-    this.resizeActiveBlocker = true;
-    this.resizingColumn = columnId;
-    this.startX = event.pageX;
-    
-    // Use default width based on column type instead of hardcoded 100
-    const column = this.getColumn(columnId);
-    const defaultWidth = this.getDefaultWidthForType(column?.type ?? 'text');
-    this.startWidth = this.columnWidths.get(columnId) ?? defaultWidth;
-
-    // Attach document listeners
-    this.renderer.listen('document', 'mousemove', this.onResizeMove);
-    this.renderer.listen('document', 'mouseup', this.onResizeEnd);
+  onResizeStart(event: ColumnResizeEvent): void {
+    this.isResizing = true;
+    // Note: No markForCheck needed here - template reads isResizing directly
 
     if (this.debug) {
-      console.log('[SimpleTableV2] Resize started:', columnId, this.startWidth);
+      console.log('[SimpleTableV2] Resize started:', event.columnId, event.width);
     }
   }
 
   /**
-   * Handle resize movement
+   * Handle resize end from directive
+   * Updates columnWidths Map and emits for localStorage persistence
    */
-  private onResizeMove = (event: MouseEvent): void => {
-    if (!this.resizing || !this.resizingColumn) return;
+  onResizeEnd(event: ColumnResizeEvent): void {
+    if (this.debug) {
+      console.log('[SimpleTableV2] Resize ended:', event.columnId, event.width);
+    }
 
-    const diff = event.pageX - this.startX;
-    const column = this.getColumn(this.resizingColumn);
-    
-    // Use DEFAULT_COLUMN_WIDTHS based on column type instead of hardcoded values
-    const columnType = column?.type ?? 'text';
-    const defaultWidths = DEFAULT_COLUMN_WIDTHS[columnType as keyof typeof DEFAULT_COLUMN_WIDTHS] ?? DEFAULT_COLUMN_WIDTHS['text'];
-    
-    const minWidth = column?.width?.min ?? defaultWidths.min;
-    const maxWidth = column?.width?.max ?? defaultWidths.max;
-    
-    const newWidth = Math.max(minWidth, Math.min(maxWidth, this.startWidth + diff));
-    
-    this.columnWidths.set(this.resizingColumn, newWidth);
+    // Update internal Map for consistency
+    this.columnWidths.set(event.columnId, event.width);
+
+    // Emit for external persistence (localStorage)
+    this.columnWidthChange.emit(event);
+
+    // Reset flag - sort becomes clickable again
+    this.isResizing = false;
     this.cdr.markForCheck();
-  };
+  }
 
   /**
-   * End resize
+   * Get initial width for a column (used by directive)
    */
-  private onResizeEnd = (): void => {
-    if (this.resizing) {
-      this.resizing = false;
-      
-      if (this.debug && this.resizingColumn) {
-        console.log('[SimpleTableV2] Resize ended:', this.resizingColumn, this.columnWidths.get(this.resizingColumn));
-      }
-      
-      this.resizingColumn = null;
-      
-      // Délai pour absorber le click parasite qui survient après mouseup
-      setTimeout(() => {
-        this.resizeActiveBlocker = false;
-        this.cdr.markForCheck();
-      }, 200);
-    }
-  };
+  getInitialWidth(columnId: string): number {
+    return this.columnWidths.get(columnId) ?? this.getDefaultWidthForType('text');
+  }
+
+  /**
+   * Get min width for a column (used by directive)
+   */
+  getMinWidth(columnId: string): number {
+    const column = this.getColumn(columnId);
+    const columnType = column?.type ?? 'text';
+    const defaultWidths = DEFAULT_COLUMN_WIDTHS[columnType as keyof typeof DEFAULT_COLUMN_WIDTHS] ?? DEFAULT_COLUMN_WIDTHS['text'];
+    return column?.width?.min ?? defaultWidths.min;
+  }
+
+  /**
+   * Get max width for a column (used by directive)
+   */
+  getMaxWidth(columnId: string): number {
+    const column = this.getColumn(columnId);
+    const columnType = column?.type ?? 'text';
+    const defaultWidths = DEFAULT_COLUMN_WIDTHS[columnType as keyof typeof DEFAULT_COLUMN_WIDTHS] ?? DEFAULT_COLUMN_WIDTHS['text'];
+    return column?.width?.max ?? defaultWidths.max;
+  }
 }
