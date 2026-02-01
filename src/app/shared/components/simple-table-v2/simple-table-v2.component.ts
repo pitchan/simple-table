@@ -4,12 +4,13 @@ import {
   ChangeDetectorRef,
   Component,
   DestroyRef,
+  ElementRef,
   EventEmitter,
-  HostBinding,
   Input,
   OnChanges,
   OnInit,
   Output,
+  Renderer2,
   SimpleChanges,
   ViewChild,
   inject,
@@ -84,11 +85,16 @@ import { ColumnResizeDirective, ColumnResizeEvent } from './directives/column-re
   ],
 })
 export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewInit {
-  private cdr = inject(ChangeDetectorRef);
-  private destroyRef = inject(DestroyRef);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly elementRef = inject(ElementRef);
+  private readonly renderer = inject(Renderer2);
 
   /** Flag to track if AfterViewInit has been called */
   private viewInitialized = false;
+
+  /** Cache du wrapper pour éviter querySelector() répétés */
+  private wrapperEl?: HTMLElement;
 
   // ========== INPUTS ==========
   /** Data source - can be an array, DataSource, or FilterableDataSource */
@@ -148,15 +154,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   // ========== COLUMN RESIZE STATE ==========
   /** Flag to block sort during resize (no setTimeout needed) */
   isResizing = false;
-
-  // Dynamic CSS custom properties for column widths
-  @HostBinding('style') get hostStyles(): Record<string, string> {
-    const styles: Record<string, string> = {};
-    this.columnWidths.forEach((width, columnId) => {
-      styles[`--column-${columnId}-width`] = `${width}px`;
-    });
-    return styles;
-  }
 
   // ========== LIFECYCLE ==========
   ngOnInit(): void {
@@ -252,6 +249,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       const width = col.width?.initial ?? this.getDefaultWidthForType(col.type ?? 'text');
       this.columnWidths.set(col.id, width);
     });
+
+    // Apply CSS vars to wrapper (directive will update during drag)
+    this.applyColumnWidthsToHost();
 
     if (this.debug) {
       console.log('[SimpleTableV2] Columns initialized:', this.displayedColumns);
@@ -470,6 +470,41 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     };
   }
 
+  // ========== COLUMN WIDTH CSS VARS ==========
+
+  /**
+   * Get the wrapper element (cached for performance)
+   * Targets the same element as the directive for consistency
+   */
+  private getWrapper(): HTMLElement | null {
+    return this.wrapperEl ??= this.elementRef.nativeElement.querySelector('.simple-table-v2-container');
+  }
+
+  /**
+   * Apply CSS vars for column widths on the wrapper element
+   * Called at init and after resize end (not during drag - directive handles that)
+   */
+  private applyColumnWidthsToHost(): void {
+    const wrapper = this.getWrapper();
+    if (!wrapper) return;
+
+    // Clear existing column CSS vars (avoids "ghosts" if columns change)
+    Array.from(wrapper.style).forEach((prop: string) => {
+      if (prop.startsWith('--column-')) {
+        this.renderer.removeStyle(wrapper, prop);
+      }
+    });
+
+    // Apply all column widths
+    this.columnWidths.forEach((width, columnId) => {
+      this.renderer.setStyle(wrapper, `--column-${columnId}-width`, `${width}px`);
+    });
+
+    if (this.debug) {
+      console.log('[SimpleTableV2] CSS vars applied to wrapper:', this.columnWidths.size, 'columns');
+    }
+  }
+
   // ========== COLUMN RESIZE HANDLERS ==========
   
   /**
@@ -496,6 +531,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
     // Update internal Map for consistency
     this.columnWidths.set(event.columnId, event.width);
+
+    // Re-apply CSS vars to wrapper (ensures consistency after drag)
+    this.applyColumnWidthsToHost();
 
     // Emit for external persistence (localStorage)
     this.columnWidthChange.emit(event);
