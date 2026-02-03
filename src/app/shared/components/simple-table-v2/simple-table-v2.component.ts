@@ -33,6 +33,7 @@ import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sour
 import { TableStrategyFactory } from './strategies/strategy.factory';
 import { ITableStrategy } from './models/table-strategy.interface';
 import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS } from './models/column-def.model';
+import { TableConfigEditorComponent } from '../table-config-editor/table-config-editor.component';
 import { ColumnResizeDirective, ColumnResizeEvent } from './directives/column-resize.directive';
 
 /**
@@ -82,6 +83,7 @@ import { ColumnResizeDirective, ColumnResizeEvent } from './directives/column-re
     MatProgressSpinnerModule,
     TranslateModule,
     ColumnResizeDirective,
+    TableConfigEditorComponent
   ],
 })
 export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewInit {
@@ -155,6 +157,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   /** Flag to block sort during resize (no setTimeout needed) */
   isResizing = false;
 
+  // ========== CONFIG EDITOR STATE ==========
+  editorOptions: any = { columns: { columns: [], groups: [] } };
+
   // ========== LIFECYCLE ==========
   ngOnInit(): void {
     if (this.debug) {
@@ -165,6 +170,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
     this.validateInputs();
     this.initializeColumns();
+    this.initializeConfigEditor();
     this.initializeStrategy();
 
     if (this.debug) {
@@ -212,6 +218,45 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     }
   }
 
+  // ========== CONFIG EDITOR ==========
+  private initializeConfigEditor(): void {
+    if (this.config?.columns) {
+      // Map columns to the format expected by TableConfigEditor
+      // It expects { columns: { columns: [], groups: [] } }
+      // We assume single group for simplicity or check if grouping exists
+      const groups = [...new Set(this.config.columns.map(c => c.group).filter(g => !!g))];
+      
+      this.editorOptions = {
+        columns: {
+          columns: this.config.columns,
+          groups: groups.length > 0 ? groups : ['Default'] // Ensure at least one group so logic works
+        }
+      };
+      
+      // If no groups defined in columns, assign them to Default to match the groups array
+      if (groups.length === 0) {
+        this.config.columns.forEach(c => c.group = 'Default');
+      }
+    }
+  }
+
+  handleConfigChange(event: any): void {
+    // Event contains the updated columns structure
+    // We need to trigger a re-render of columns
+    
+    // The editor mutates the array passed to it (this.editorOptions.columns.columns)
+    // which references this.config.columns.
+    // So we just need to re-initialize visible columns.
+    
+    this.initializeColumns();
+    this.cdr.markForCheck();
+  }
+
+  handleAutoResize(event: boolean): void {
+    if (this.debug) console.log('Auto resize toggled', event);
+    // Not implemented yet
+  }
+
   // ========== INITIALIZATION ==========
   private validateInputs(): void {
     if (!this.data) {
@@ -239,10 +284,10 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     }
     this.displayedColumns.push(...this.visibleColumns.map(col => col.id));
     
-    // Add config button column at the end if enabled (DISABLED FOR NOW)
-    /*if (this.showConfigEditor) {
+    // Add config button column at the end if enabled
+    if (this.showConfigEditor) {
       this.displayedColumns.push('configButton');
-    }*/
+    }
 
     // Initialize column widths
     this.visibleColumns.forEach(col => {
@@ -513,7 +558,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
    */
   onResizeStart(event: ColumnResizeEvent): void {
     this.isResizing = true;
-    // Note: No markForCheck needed here - template reads isResizing directly
+    this.cdr.markForCheck();
 
     if (this.debug) {
       console.log('[SimpleTableV2] Resize started:', event.columnId, event.width);

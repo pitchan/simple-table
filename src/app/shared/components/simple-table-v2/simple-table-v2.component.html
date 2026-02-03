@@ -61,7 +61,7 @@
           [ngStyle]="getColumnStyles(column.id)">
           
           <span class="header-label">
-            {{ getColumnHeader(column) | translate }}
+            {{ getColumnHeader(column) }}
           </span>
           
           <!-- Resize Handle (V2: Pointer Events, CSS var on host, emit only on end) -->
@@ -123,7 +123,7 @@
       </ng-container>
 
       <!-- Config Button Column -->
-      <!-- <ng-container matColumnDef="configButton" *ngIf="showConfigEditor">
+      <ng-container matColumnDef="configButton">
         <th 
           mat-header-cell 
           *matHeaderCellDef 
@@ -131,7 +131,7 @@
           [class.sticky-column-end]="true">
           <button 
             mat-icon-button 
-            [matMenuTriggerFor]="columnMenu"
+            [matMenuTriggerFor]="configMenu"
             matTooltip="{{ 'COMMON.CONFIGURE_COLUMNS' | translate }}">
             <mat-icon>more_vert</mat-icon>
           </button>
@@ -142,7 +142,7 @@
           class="config-column"
           [class.sticky-column-end]="true">
         </td>
-      </ng-container> -->
+      </ng-container>
 
       <!-- Header Row -->
       <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: config.stickyHeader"></tr>
@@ -158,19 +158,18 @@
   </div>
 
   <!-- Column Configuration Menu -->
-  <!-- <mat-menu #columnMenu="matMenu" xPosition="before" class="table-config-menu">
+  <mat-menu #configMenu="matMenu" xPosition="before" class="table-config-menu">
     <div (click)="$event.stopPropagation()" class="config-menu-wrapper">
       <app-table-config-editor
-        *ngIf="adaptedOptions && adaptedTableConfig"
-        [options]="adaptedOptions"
-        [tableColumnDefaultConfig]="adaptedTableConfig"
+        [options]="editorOptions"
+        [tableColumnDefaultConfig]="{}"
         [hasLockOption]="true"
         [hasResponsiveOption]="false"
         (onTableColumnChangeEvent)="handleConfigChange($event)"
         (autoResizeChangeEvent)="handleAutoResize($event)">
       </app-table-config-editor>
     </div>
-  </mat-menu> -->
+  </mat-menu>
 
   <!-- Table Footer with Actions and Paginator -->
   <div class="table-footer-container" *ngIf="config.features?.pagination !== false">
