@@ -62,7 +62,7 @@
                                 [ngClass]="{'sticky': c.sticky}">
                                 <div class cdkDragHandle class="drag-handler">
                                     <mat-icon>drag_indicator</mat-icon>
-                                    <span title="{{ c.i18n | translate }}">{{ c.i18n | translate }}</span>
+                                    <span title="{{ c.i18n | translate }}">C'est ici les translate{{ c.i18n | translate }}</span>
                                 </div>
                                 <div class="colunm-attributes">
                                     <button *ngIf="hasLockOption" mat-icon-button (click)="toggleSticky($event, c)">
@@ -96,7 +96,7 @@
                                         [ngClass]="{'sticky': c.sticky}">
                                         <div class cdkDragHandle class="drag-handler">
                                             <mat-icon>drag_indicator</mat-icon>
-                                            <span title="{{ c.i18n | translate }}"> {{ c.i18n | translate }}</span>
+                                            <span title="{{ c.i18n | translate }}">TEQT {{ c.i18n | translate }}</span>
                                         </div>
                                         <div class="colunm-attributes">
                                             <button *ngIf="hasLockOption" mat-icon-button

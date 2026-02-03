@@ -230,8 +230,11 @@ td.mat-cell {
 
 // Config Menu Wrapper
 .config-menu-wrapper {
-  max-height: 400px;
-  width: 300px;
   overflow: auto;
   padding: 8px;
+  max-width: 400px;
+}
+
+.table-config-menu {
+  max-width: 400px;
 }
