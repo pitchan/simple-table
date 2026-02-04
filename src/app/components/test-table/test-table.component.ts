@@ -19,56 +19,6 @@ interface User {
 }
 
 /** Données simulées renvoyées par le "serveur" (même structure qu’un GET /api/users). */
-const MOCK_SERVER_USERS: User[] = [
-  {
-    id: '1',
-    name: 'Vincent (Dev)',
-    email: 'vincent@example.com',
-    role: 'Admin',
-    status: 'active',
-    lastLogin: new Date(),
-    phone: '+33 6 12 34 56 78',
-    score: 92,
-    department: 'Développement',
-    age: 32,
-  },
-  {
-    id: '2',
-    name: 'Jean Dupont',
-    email: 'jean.dupont@example.com',
-    role: 'User',
-    status: 'active',
-    lastLogin: new Date('2024-01-14'),
-    phone: '+33 6 98 76 54 32',
-    score: 78,
-    department: 'Commercial',
-    age: 45,
-  },
-  {
-    id: '3',
-    name: 'Marie Curie',
-    email: 'marie.curie@example.com',
-    role: 'Manager',
-    status: 'inactive',
-    lastLogin: new Date('2023-12-25'),
-    phone: '+33 6 11 22 33 44',
-    score: 95,
-    department: 'R&D',
-    age: 28,
-  },
-  {
-    id: '4',
-    name: 'Thomas Anderson',
-    email: 'neo@matrix.com',
-    role: 'User',
-    status: 'active',
-    lastLogin: new Date('2024-01-28'),
-    phone: '+1 555 123 4567',
-    score: 88,
-    department: 'Support',
-    age: 29,
-  },
-];
 
 @Component({
   selector: 'app-test-table',
@@ -188,15 +138,35 @@ export class TestTableComponent implements OnInit {
       pagination: true,
       selection: true // Test de la sélection
     },
-    defaultPageSize: 10,
-    pageSizeOptions: [5, 10, 25],
+    defaultPageSize: 2000,
+    pageSizeOptions: [100, 1000, 2000, 5000],
     stickyHeader: true,
     responsive: true,
   };
 
   ngOnInit(): void {
+    // Génération de 5000 utilisateurs pour test de performance
+    const generatedUsers: User[] = Array.from({ length: 5000 }, (_, i) => {
+      const departments = ['Développement', 'Commercial', 'R&D', 'Support', 'RH', 'Marketing'];
+      const roles = ['Admin', 'User', 'Manager', 'Guest'];
+      const statuses: ('active' | 'inactive')[] = ['active', 'inactive'];
+      
+      return {
+        id: (i + 1).toString(),
+        name: `Utilisateur ${i + 1}`,
+        email: `utilisateur.${i + 1}@example.com`,
+        role: roles[Math.floor(Math.random() * roles.length)],
+        status: statuses[Math.floor(Math.random() * statuses.length)],
+        lastLogin: new Date(Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000)), // 30 derniers jours
+        phone: `+33 6 ${Math.floor(Math.random() * 90 + 10).toString()} ${Math.floor(Math.random() * 90 + 10).toString()} ${Math.floor(Math.random() * 90 + 10).toString()} ${Math.floor(Math.random() * 90 + 10).toString()}`,
+        score: Math.floor(Math.random() * 101),
+        department: departments[Math.floor(Math.random() * departments.length)],
+        age: 20 + Math.floor(Math.random() * 46), // 20-65 ans
+      };
+    });
+
     // Simulation d’un appel serveur : délai 1,5 s puis émission des données
-    of(MOCK_SERVER_USERS)
+    of(generatedUsers)
       .pipe(
         delay(1500),
         takeUntilDestroyed(this.destroyRef)
@@ -207,6 +177,7 @@ export class TestTableComponent implements OnInit {
           this.loading = false;
           this.errorMessage = null;
           this.cdr.markForCheck();
+          console.log(`[TestTable] ${data.length} utilisateurs chargés.`);
         },
         error: (err) => {
           this.loading = false;
