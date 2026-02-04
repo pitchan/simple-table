@@ -655,9 +655,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     // Remove resizing class from document body
     DomHandler.removeClass(document.body, 'p-unselectable-text');
 
-    // Reset resizing flag
-    this.isResizing = false;
-
     // Emit event for external persistence if we have a valid result
     if (resizeResult) {
       // Update internal column widths map
@@ -676,7 +673,12 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       }
     }
 
-    this.cdr.markForCheck();
+    // Reset resizing flag with a small delay to prevent sort trigger on mouseup
+    // The click event fires after mouseup, so we keep isResizing=true during that tick
+    setTimeout(() => {
+      this.isResizing = false;
+      this.cdr.markForCheck();
+    });
   }
 
   /**
