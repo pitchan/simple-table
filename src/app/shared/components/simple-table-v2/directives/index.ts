@@ -1,1 +1,1 @@
-export * from './column-resize.directive';
+export * from './resizable-column.directive';

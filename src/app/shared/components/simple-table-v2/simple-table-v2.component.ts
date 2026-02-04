@@ -7,7 +7,9 @@ import {
   ElementRef,
   EventEmitter,
   Input,
+  NgZone,
   OnChanges,
+  OnDestroy,
   OnInit,
   Output,
   Renderer2,
@@ -32,9 +34,11 @@ import { DataSource } from '@angular/cdk/collections';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { TableStrategyFactory } from './strategies/strategy.factory';
 import { ITableStrategy } from './models/table-strategy.interface';
-import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS } from './models/column-def.model';
+import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode } from './models/column-def.model';
 import { TableConfigEditorComponent } from '../table-config-editor/table-config-editor.component';
-import { ColumnResizeDirective, ColumnResizeEvent } from './directives/column-resize.directive';
+import { ResizableColumnDirective, ResizableColumnEvent } from './directives/resizable-column.directive';
+import { TableResizeService, ColumnResizeEvent } from './services/table-resize.service';
+import { DomHandler } from './helpers/dom-handler';
 
 /**
  * SimpleTableV2Component - Refactored with Strategy Pattern
@@ -82,21 +86,27 @@ import { ColumnResizeDirective, ColumnResizeEvent } from './directives/column-re
     MatMenuModule,
     MatProgressSpinnerModule,
     TranslateModule,
-    ColumnResizeDirective,
+    ResizableColumnDirective,
     TableConfigEditorComponent
   ],
+  providers: [TableResizeService],
 })
-export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewInit {
+export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly elementRef = inject(ElementRef);
   private readonly renderer = inject(Renderer2);
+  private readonly ngZone = inject(NgZone);
+  private readonly resizeService = inject(TableResizeService);
 
   /** Flag to track if AfterViewInit has been called */
   private viewInitialized = false;
 
   /** Cache du wrapper pour éviter querySelector() répétés */
   private wrapperEl?: HTMLElement;
+
+  /** Cache de l'élément table */
+  private tableEl?: HTMLElement;
 
   // ========== INPUTS ==========
   /** Data source - can be an array, DataSource, or FilterableDataSource */
@@ -136,6 +146,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   // ========== VIEW CHILDREN ==========
   @ViewChild(MatSort) sort!: MatSort;
   @ViewChild(MatPaginator) paginator!: MatPaginator;
+  @ViewChild('resizeHelper') resizeHelper!: ElementRef<HTMLDivElement>;
+  @ViewChild('tableElement', { read: ElementRef }) tableElementRef!: ElementRef<HTMLTableElement>;
 
   // ========== STRATEGY (internal) ==========
   private strategy!: ITableStrategy<T>;
@@ -550,42 +562,139 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     }
   }
 
-  // ========== COLUMN RESIZE HANDLERS ==========
-  
+  // ========== COLUMN RESIZE HANDLERS (PrimeNG-style) ==========
+
   /**
-   * Handle resize start from directive
-   * Sets isResizing flag to disable sort during drag
+   * Get the column resize mode from config (default: 'fit')
    */
-  onResizeStart(event: ColumnResizeEvent): void {
+  get columnResizeMode(): ColumnResizeMode {
+    return this.config?.columnResizeMode ?? 'fit';
+  }
+
+  /**
+   * Check if column resizing is enabled globally
+   */
+  get resizableColumnsEnabled(): boolean {
+    return this.config?.resizableColumns !== false && this.config?.features?.resize !== false;
+  }
+
+  /**
+   * Handle resize begin from directive (PrimeNG-style)
+   * @param event The resize event from the directive
+   */
+  onColumnResizeBegin(event: ResizableColumnEvent): void {
+    const tableEl = this.getTableElement();
+    const helperEl = this.resizeHelper?.nativeElement;
+    const containerEl = this.getWrapper();
+
+    if (!tableEl || !helperEl || !containerEl) {
+      console.warn('[SimpleTableV2] Missing elements for resize');
+      return;
+    }
+
+    // Configure service with current mode
+    this.resizeService.configure({
+      columnResizeMode: this.columnResizeMode,
+      minColumnWidth: this.getMinWidth(this.getColumnIdFromElement(event.element)),
+    });
+
+    // Initialize column widths from current DOM state
+    const headerRow = tableEl.querySelector('tr.mat-header-row') as HTMLElement;
+    if (headerRow) {
+      this.resizeService.initializeWidths(tableEl, headerRow);
+    }
+
+    // Begin resize operation
+    this.resizeService.beginResize(event.originalEvent, event.element, containerEl, helperEl);
+    
+    // Set resizing flag to disable sort
     this.isResizing = true;
+    
+    // Add resizing class to document body
+    DomHandler.addClass(document.body, 'p-unselectable-text');
+    
     this.cdr.markForCheck();
 
     if (this.debug) {
-      console.log('[SimpleTableV2] Resize started:', event.columnId, event.width);
+      console.log('[SimpleTableV2] Resize begin:', this.getColumnIdFromElement(event.element));
     }
   }
 
   /**
-   * Handle resize end from directive
-   * Updates columnWidths Map and emits for localStorage persistence
+   * Handle resize move from directive (PrimeNG-style)
+   * Runs outside Angular zone for performance
+   * @param event The resize event from the directive
    */
-  onResizeEnd(event: ColumnResizeEvent): void {
-    if (this.debug) {
-      console.log('[SimpleTableV2] Resize ended:', event.columnId, event.width);
+  onColumnResize(event: ResizableColumnEvent): void {
+    const tableEl = this.getTableElement();
+    const helperEl = this.resizeHelper?.nativeElement;
+    const containerEl = this.getWrapper();
+
+    if (!tableEl || !helperEl || !containerEl) return;
+
+    // Update helper position (runs outside zone by directive)
+    this.resizeService.updateHelperPosition(event.originalEvent, containerEl, helperEl);
+
+    // Apply resize (live update)
+    this.resizeService.onResize(event.originalEvent, containerEl, helperEl);
+  }
+
+  /**
+   * Handle resize end from directive (PrimeNG-style)
+   * @param event The resize event from the directive
+   */
+  onColumnResizeEnd(event: ResizableColumnEvent): void {
+    const tableEl = this.getTableElement();
+    const helperEl = this.resizeHelper?.nativeElement;
+
+    if (!tableEl || !helperEl) return;
+
+    // Finalize resize and get result
+    const resizeResult = this.resizeService.endResize(helperEl, tableEl);
+
+    // Remove resizing class from document body
+    DomHandler.removeClass(document.body, 'p-unselectable-text');
+
+    // Reset resizing flag
+    this.isResizing = false;
+
+    // Emit event for external persistence if we have a valid result
+    if (resizeResult) {
+      // Update internal column widths map
+      const widths = this.resizeService.getColumnWidths();
+      this.visibleColumns.forEach((col, index) => {
+        if (widths[index] !== undefined) {
+          this.columnWidths.set(col.id, widths[index]);
+        }
+      });
+
+      // Emit change event
+      this.columnWidthChange.emit(resizeResult);
+
+      if (this.debug) {
+        console.log('[SimpleTableV2] Resize end:', resizeResult);
+      }
     }
 
-    // Update internal Map for consistency
-    this.columnWidths.set(event.columnId, event.width);
-
-    // Re-apply CSS vars to wrapper (ensures consistency after drag)
-    this.applyColumnWidthsToHost();
-
-    // Emit for external persistence (localStorage)
-    this.columnWidthChange.emit(event);
-
-    // Reset flag - sort becomes clickable again
-    this.isResizing = false;
     this.cdr.markForCheck();
+  }
+
+  /**
+   * Get column ID from a <th> element
+   */
+  private getColumnIdFromElement(element: HTMLElement): string {
+    return element.getAttribute('data-column') || '';
+  }
+
+  /**
+   * Get the table element (cached)
+   */
+  private getTableElement(): HTMLElement | null {
+    if (this.tableElementRef?.nativeElement) {
+      return this.tableElementRef.nativeElement;
+    }
+    // Fallback to querySelector if ViewChild not available yet
+    return this.tableEl ??= this.elementRef.nativeElement.querySelector('table.simple-table-v2');
   }
 
   /**
@@ -613,5 +722,12 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     const columnType = column?.type ?? 'text';
     const defaultWidths = DEFAULT_COLUMN_WIDTHS[columnType as keyof typeof DEFAULT_COLUMN_WIDTHS] ?? DEFAULT_COLUMN_WIDTHS['text'];
     return column?.width?.max ?? defaultWidths.max;
+  }
+
+  // ========== LIFECYCLE CLEANUP ==========
+  
+  ngOnDestroy(): void {
+    // Service cleanup is handled by Angular's DI
+    this.resizeService.reset();
   }
 }

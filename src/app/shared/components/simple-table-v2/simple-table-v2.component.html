@@ -1,4 +1,9 @@
-<div class="simple-table-v2-container" [class.loading]="isLoading">
+<div class="simple-table-v2-container" 
+     [class.loading]="isLoading"
+     [class.p-datatable-resizable]="resizableColumnsEnabled"
+     [class.p-datatable-resizable-fit]="resizableColumnsEnabled && columnResizeMode === 'fit'"
+     [class.p-datatable-resizable-expand]="resizableColumnsEnabled && columnResizeMode === 'expand'">
+  
   <!-- Debug Info -->
   <div *ngIf="debug" style="background: #f0f0f0; padding: 10px; margin-bottom: 10px;">
     <strong>Debug Info:</strong><br>
@@ -6,8 +11,13 @@
     Total Count: {{ totalCount }}<br>
     Displayed Columns: {{ displayedColumns.join(', ') }}<br>
     Is Loading: {{ isLoading }}<br>
-    Data Source Type: {{ data ? data.constructor.name : 'undefined' }}
+    Data Source Type: {{ data ? data.constructor.name : 'undefined' }}<br>
+    Resize Mode: {{ columnResizeMode }}<br>
+    Is Resizing: {{ isResizing }}
   </div>
+
+  <!-- Resize Helper Indicator (PrimeNG-style vertical line during resize) -->
+  <div #resizeHelper class="p-datatable-column-resize-helper" style="display: none;"></div>
 
   <!-- Loading Overlay -->
   <div class="loading-overlay" *ngIf="isLoading">
@@ -17,13 +27,15 @@
   <!-- Table -->
   <div class="table-wrapper" [class.sticky-header]="config.stickyHeader">
     <table 
+      #tableElement
       mat-table 
       [dataSource]="tableData" 
       matSort
       [matSortDisabled]="config.features?.sort === false"
       (matSortChange)="onSortChangeEvent($event)"
       class="simple-table-v2"
-      [class.responsive]="config.responsive">
+      [class.responsive]="config.responsive"
+      [class.p-datatable-resizing]="isResizing">
 
       <!-- Selection Column -->
       <ng-container matColumnDef="select" *ngIf="selection && config.features?.selection !== false">
@@ -48,7 +60,7 @@
         *ngFor="let column of visibleColumns; trackBy: trackByColumnId" 
         [matColumnDef]="column.id">
         
-        <!-- Header Cell -->
+        <!-- Header Cell (PrimeNG-style with resizable directive) -->
         <th 
           mat-header-cell 
           *matHeaderCellDef 
@@ -56,26 +68,17 @@
           [disabled]="column.sortable === false || isResizing"
           [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
           [class.sticky-column-end]="column.sticky === 'end'"
-          [class.resizable-header]="column.resizable !== false"
+          [class.p-resizable-column]="resizableColumnsEnabled && column.resizable !== false"
           [attr.data-column]="column.id"
-          [ngStyle]="getColumnStyles(column.id)">
+          [ngStyle]="getColumnStyles(column.id)"
+          pResizableColumn
+          [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false"
+          (resizeBegin)="onColumnResizeBegin($event)"
+          (resize)="onColumnResize($event)"
+          (resizeEnd)="onColumnResizeEnd($event)">
           
           <span class="header-label">
             {{ getColumnHeader(column) }}
-          </span>
-          
-          <!-- Resize Handle (V2: Pointer Events, CSS var on host, emit only on end) -->
-          <span 
-            *ngIf="column.resizable !== false"
-            class="resize-handle"
-            columnResize
-            [columnId]="column.id"
-            [minWidth]="getMinWidth(column.id)"
-            [maxWidth]="getMaxWidth(column.id)"
-            [initialWidth]="getInitialWidth(column.id)"
-            [debug]="debug"
-            (resizeStart)="onResizeStart($event)"
-            (resizeEnd)="onResizeEnd($event)">
           </span>
         </th>
 

@@ -1,3 +1,6 @@
+// ========== Local Variables ==========
+$resize-helper-color: #2196f3;
+
 .simple-table-v2-container {
   position: relative;
   display: flex;
@@ -10,6 +13,48 @@
     opacity: 0.7;
     pointer-events: none;
   }
+
+  // ========== PrimeNG-style Resize Modes ==========
+  
+  // Resizable table base styles
+  &.p-datatable-resizable {
+    > .table-wrapper > table.simple-table-v2 {
+      table-layout: fixed;
+    }
+  }
+
+  // Fit mode: table width stays constant, adjacent columns affected
+  &.p-datatable-resizable-fit {
+    > .table-wrapper > table.simple-table-v2 {
+      width: 100%;
+    }
+  }
+
+  // Expand mode: table width can grow, horizontal scroll appears
+  &.p-datatable-resizable-expand {
+    > .table-wrapper {
+      overflow-x: auto;
+    }
+    
+    > .table-wrapper > table.simple-table-v2 {
+      width: auto;
+      min-width: 100%;
+    }
+  }
+}
+
+// ========== PrimeNG-style Resize Helper (vertical indicator line) ==========
+.p-datatable-column-resize-helper {
+  position: absolute;
+  z-index: 1001;
+  width: 2px;
+  background-color: $resize-helper-color;
+  pointer-events: none;
+  top: 0;
+  bottom: 0;
+  
+  // Subtle shadow for visibility
+  box-shadow: 0 0 4px rgba(33, 150, 243, 0.5);
 }
 
 .table-toolbar {
@@ -53,10 +98,6 @@
 table.simple-table-v2 {
   width: 100%;
   border-collapse: collapse;
-
-  &.responsive {
-    // Add responsive styles if needed
-  }
 }
 
 // Sticky Header & Column Styles
@@ -98,40 +139,6 @@ th.mat-header-cell {
   .mat-icon-button {
     margin: 0 auto;
   }
-}
-
-// Resize Handle
-.resize-handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 15px; // Hit area
-  cursor: col-resize;
-  z-index: 10;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  
-  // Visual indicator (thin line)
-  &::after {
-    content: '';
-    width: 1px;
-    height: 50%;
-    background-color: rgba(0,0,0,0.12);
-    transition: background-color 0.2s;
-  }
-
-  &:hover::after, &:active::after {
-    background-color: #2196f3; // Active color
-    width: 2px;
-  }
-}
-
-// Dragging state (applied to body/document usually, but here for context)
-.resizing {
-  cursor: col-resize;
-  user-select: none;
 }
 
 // Sticky Columns

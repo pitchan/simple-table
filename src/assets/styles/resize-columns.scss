@@ -1,0 +1,99 @@
+/* ========== Column Resize Variables ========== */
+$resize-helper-color: #2196f3;
+$resize-handle-width: 8px;
+
+/* Column resize cursor (applied to body during table column resize) */
+body.column-resizing {
+  cursor: col-resize !important;
+  user-select: none;
+  
+  // Disable pointer events on everything to prevent hover effects (tooltips, sort headers)
+  // causing interference or "stuck" states
+  * {
+    cursor: col-resize !important;
+    pointer-events: none !important;
+  }
+  
+  // CRITICAL: Keep pointer-events active on the resizer to maintain pointer capture
+  // Without this, moving the mouse too fast or over other elements breaks the drag
+  .p-datatable-column-resizer {
+    pointer-events: auto !important;
+  }
+}
+
+/* Unselectable text during resize (PrimeNG compatibility) */
+body.p-unselectable-text {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* ========== PrimeNG-style Column Resizer (Global Styles) ========== */
+/* These styles target dynamically created elements by ResizableColumnDirective */
+
+/* Resizable column header styling */
+th.p-resizable-column {
+  position: relative;
+}
+
+/* The resize handle created by the directive */
+th.p-resizable-column .p-datatable-column-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: $resize-handle-width;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  touch-action: none; /* Important for pointer events */
+}
+
+/* Visual indicator - ALWAYS visible (subtle line) */
+th.p-resizable-column .p-datatable-column-resizer::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  right: 50%;
+  width: 2px;
+  background-color: rgba(0, 0, 0, 0.15);
+  transform: translateX(50%);
+  transition: background-color 0.2s ease, width 0.15s ease, box-shadow 0.2s ease;
+  border-radius: 1px;
+}
+
+/* Hover state - more visible */
+th.p-resizable-column .p-datatable-column-resizer:hover::after {
+  background-color: $resize-helper-color;
+  width: 3px;
+  box-shadow: 0 0 4px rgba(33, 150, 243, 0.4);
+}
+
+/* Focus visible for keyboard accessibility (WCAG AA) */
+th.p-resizable-column .p-datatable-column-resizer:focus-visible {
+  outline: none;
+}
+
+th.p-resizable-column .p-datatable-column-resizer:focus-visible::after {
+  background-color: $resize-helper-color;
+  width: 3px;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
+}
+
+/* Active resizing state on the column */
+th.p-resizable-column.p-resizable-column-resizing .p-datatable-column-resizer::after {
+  background-color: $resize-helper-color;
+  width: 3px;
+  box-shadow: 0 0 6px rgba(33, 150, 243, 0.5);
+}
+
+/* Table state during resize - prevent text selection */
+table.p-datatable-resizing th,
+table.p-datatable-resizing td {
+  user-select: none;
+}
+
+

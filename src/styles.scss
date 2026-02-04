@@ -1,19 +1,8 @@
+@use 'assets/styles/resize-columns.scss';
+@use 'assets/styles/table-config-editor.scss';
+
 /* You can add global styles to this file, and also import other style files */
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 
-/* Column resize cursor (applied to body during table column resize) */
-body.column-resizing {
-  cursor: col-resize !important;
-  user-select: none;
-  
-  * {
-    cursor: col-resize !important;
-  }
-}
-
-/* Table Config Editor Menu - Override Material default max-width */
-.table-config-menu-panel.mat-mdc-menu-panel {
-  max-width: unset;
-}

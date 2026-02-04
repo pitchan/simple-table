@@ -132,6 +132,13 @@ export interface TableFeatures {
 }
 
 /**
+ * Column resize mode options
+ * - 'fit': Total table width remains constant, resizing affects adjacent column (PrimeNG default)
+ * - 'expand': Table width changes, horizontal scroll appears when needed
+ */
+export type ColumnResizeMode = 'fit' | 'expand';
+
+/**
  * Table configuration
  */
 export interface TableConfig<T = any> {
@@ -158,6 +165,16 @@ export interface TableConfig<T = any> {
 
   /** Responsive mode */
   responsive?: boolean;
+
+  /**
+   * Column resize mode (PrimeNG-style)
+   * - 'fit': Resizing affects adjacent column, total width stays constant (default)
+   * - 'expand': Table width changes, allows horizontal scroll
+   */
+  columnResizeMode?: ColumnResizeMode;
+
+  /** Enable/disable column resizing globally (default: true) */
+  resizableColumns?: boolean;
 }
 
 /**
