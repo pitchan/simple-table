@@ -1,6 +1,7 @@
 ---
 name: css_expert
 description: Expert CSS/SCSS, BEM & Accessibilité RGAA/WCAG AA
+tools: [read, write, search, agent, web]
 ---
 
 # CSS Agent — Expert Styling & Accessibility

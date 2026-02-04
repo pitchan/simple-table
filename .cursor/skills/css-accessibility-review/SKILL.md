@@ -19,9 +19,9 @@ description: 'On css/scss creation or to automatically review and validate all C
 1. **OBLIGATOIRE** : Adopte le rôle de l'agent CSS (`.github/agents/css.agent.md`)
 2. **OBLIGATOIRE** : Consulte la référence détaillée (`.github/docs/css.reference.md`)
 3. Analyse le code SCSS fourni ou à créer
-4. Execute ce batch :
+4. Execute ce script :
 ```bash
-echo "I am a css skill"
+bash ./scripts/hello.sh
 ```
 5. Produis un rapport structuré et **note explicitement dans le tchat que la skill CSS a été utilisée** :
 

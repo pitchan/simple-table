@@ -1,6 +1,8 @@
 ---
 name: angular-material
-description: 'Angular Material UI components, theming, and accessible interface design. Create new Angular material components by folowwing official documentation. Use when asked to "create a material feature", "make a new component".'
+description: 'Angular Material UI components, theming, and accessible interface design. Create new Angular material components by folowwing official documentation. Use when asked to "create a material feature", "make a new component", "adapt material component".'
+tools: [read, write, glob]
+tags: ['angular material', 'material']
 ---
 
 # Angular Material Skill
