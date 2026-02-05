@@ -621,25 +621,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   /**
-   * Handle resize move from directive (PrimeNG-style)
-   * Runs outside Angular zone for performance
-   * @param event The resize event from the directive
-   */
-  onColumnResize(event: ResizableColumnEvent): void {
-    const tableEl = this.getTableElement();
-    const helperEl = this.resizeHelper?.nativeElement;
-    const containerEl = this.getWrapper();
-
-    if (!tableEl || !helperEl || !containerEl) return;
-
-    // Update helper position (runs outside zone by directive)
-    this.resizeService.updateHelperPosition(event.originalEvent, containerEl, helperEl);
-
-    // Apply resize (live update)
-    this.resizeService.onResize(event.originalEvent, containerEl, helperEl);
-  }
-
-  /**
    * Handle resize end from directive (PrimeNG-style)
    * @param event The resize event from the directive
    */

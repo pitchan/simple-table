@@ -74,7 +74,6 @@
           pResizableColumn
           [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false"
           (resizeBegin)="onColumnResizeBegin($event)"
-          (resize)="onColumnResize($event)"
           (resizeEnd)="onColumnResizeEnd($event)">
           
           <span class="header-label">

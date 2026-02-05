@@ -14,6 +14,7 @@ import {
   booleanAttribute,
 } from '@angular/core';
 import { DomHandler } from '../helpers/dom-handler';
+import { TableResizeService } from '../services/table-resize.service';
 
 /**
  * Event emitted when resize operations occur
@@ -33,8 +34,9 @@ export interface ResizableColumnEvent {
  * Features:
  * - Dynamically creates resize handle element
  * - Pointer Events API for cross-device support (mouse, touch, stylus)
- * - Communicates with parent table via output events
- * - Runs drag operations outside Angular zone for performance
+ * - Calls TableResizeService.onDragMove() directly during drag (outside Angular zone)
+ * - Communicates begin/end with parent table via output events
+ * - Runs drag operations outside Angular zone for performance (zero CD during drag)
  * 
  * @example
  * ```html
@@ -43,7 +45,6 @@ export interface ResizableColumnEvent {
  *   pResizableColumn
  *   [pResizableColumnDisabled]="column.resizable === false"
  *   (resizeBegin)="onColumnResizeBegin($event)"
- *   (resize)="onColumnResize($event)"
  *   (resizeEnd)="onColumnResizeEnd($event)">
  *   Column Header
  * </th>
@@ -62,6 +63,7 @@ export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
   private readonly renderer = inject(Renderer2);
   private readonly ngZone = inject(NgZone);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+  private readonly resizeService = inject(TableResizeService);
 
   // ========== INPUTS ==========
   /** Disable resize for this column */
@@ -70,9 +72,6 @@ export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
   // ========== OUTPUTS ==========
   /** Emitted when resize operation begins (pointerdown on resizer) */
   @Output() resizeBegin = new EventEmitter<ResizableColumnEvent>();
-
-  /** Emitted during resize (pointermove) */
-  @Output() resize = new EventEmitter<ResizableColumnEvent>();
 
   /** Emitted when resize operation ends (pointerup) */
   @Output() resizeEnd = new EventEmitter<ResizableColumnEvent>();
@@ -214,17 +213,13 @@ export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
 
   /**
    * Handle pointer move during resize
+   * Calls service directly OUTSIDE Angular zone = zero change detection
    */
   private onDocumentPointerMove = (event: PointerEvent): void => {
     if (!this._resizing || event.pointerId !== this.activePointerId) return;
 
-    // Emit resize event (in Angular zone)
-    this.ngZone.run(() => {
-      this.resize.emit({
-        originalEvent: event,
-        element: this.elementRef.nativeElement
-      });
-    });
+    // Direct call to service outside Angular zone (no CD triggered)
+    this.resizeService.onDragMove(event);
   };
 
   /**
@@ -247,6 +242,7 @@ export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
 
   /**
    * Handle touch move during resize (mobile)
+   * Calls service directly OUTSIDE Angular zone = zero change detection
    */
   private onDocumentTouchMove = (event: TouchEvent): void => {
     if (!this._resizing) return;
@@ -260,12 +256,8 @@ export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
       bubbles: true
     });
 
-    this.ngZone.run(() => {
-      this.resize.emit({
-        originalEvent: syntheticEvent,
-        element: this.elementRef.nativeElement
-      });
-    });
+    // Direct call to service outside Angular zone (no CD triggered)
+    this.resizeService.onDragMove(syntheticEvent);
   };
 
   /**
@@ -331,7 +323,7 @@ export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
       });
     });
 
-    // Emit resize with delta
+    // Move via service (same path as pointer/touch drag)
     const resizeEvent = new PointerEvent('pointermove', {
       clientX: startX + delta,
       clientY: rect.top + rect.height / 2,
@@ -339,12 +331,7 @@ export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
       bubbles: true
     });
 
-    this.ngZone.run(() => {
-      this.resize.emit({
-        originalEvent: resizeEvent,
-        element: this.elementRef.nativeElement
-      });
-    });
+    this.resizeService.onDragMove(resizeEvent);
 
     // Emit end
     const endEvent = new PointerEvent('pointerup', {
