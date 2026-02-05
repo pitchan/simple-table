@@ -72,7 +72,7 @@ export class ProductLineSearchExampleComponent implements OnInit {
       this.snackBar,
       this.translate
     );
-
+    
     // Set initial filter to trigger first load
     this.dataSource.filterSubject.next({
       name: '',

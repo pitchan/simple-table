@@ -89,7 +89,6 @@
           [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
           [class.sticky-column-end]="column.sticky === 'end'"
           [attr.data-column]="column.id"
-          [ngStyle]="getColumnStyles(column.id)"
           [matTooltip]="column.tooltip ? getCellValue(row, column) : ''"
           [matTooltipDisabled]="!column.tooltip">
           
