@@ -2,6 +2,7 @@ import { Component, DebugElement } from '@angular/core';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ResizableColumnDirective, ResizableColumnEvent } from './resizable-column.directive';
+import { TableResizeService } from '../services/table-resize.service';
 
 /**
  * Test host component for ResizableColumnDirective
@@ -9,6 +10,7 @@ import { ResizableColumnDirective, ResizableColumnEvent } from './resizable-colu
 @Component({
   standalone: true,
   imports: [ResizableColumnDirective],
+  providers: [TableResizeService],
   template: `
     <table>
       <thead>
@@ -17,7 +19,6 @@ import { ResizableColumnDirective, ResizableColumnEvent } from './resizable-colu
             pResizableColumn 
             [pResizableColumnDisabled]="disabled"
             (resizeBegin)="onResizeBegin($event)"
-            (resize)="onResize($event)"
             (resizeEnd)="onResizeEnd($event)"
             data-column="testColumn">
             Test Header
@@ -31,15 +32,10 @@ import { ResizableColumnDirective, ResizableColumnEvent } from './resizable-colu
 class TestHostComponent {
   disabled = false;
   resizeBeginEvent: ResizableColumnEvent | null = null;
-  resizeEvent: ResizableColumnEvent | null = null;
   resizeEndEvent: ResizableColumnEvent | null = null;
 
   onResizeBegin(event: ResizableColumnEvent): void {
     this.resizeBeginEvent = event;
-  }
-
-  onResize(event: ResizableColumnEvent): void {
-    this.resizeEvent = event;
   }
 
   onResizeEnd(event: ResizableColumnEvent): void {
@@ -124,7 +120,11 @@ describe('ResizableColumnDirective', () => {
       expect(hostComponent.resizeBeginEvent?.element).toBe(thElement.nativeElement);
     }));
 
-    it('should emit resize on pointermove during resize', fakeAsync(() => {
+    it('should call resizeService.onDragMove on pointermove during resize', fakeAsync(() => {
+      // Spy on the service
+      const resizeService = thElement.injector.get(TableResizeService);
+      const spy = spyOn(resizeService, 'onDragMove');
+
       // Start resize
       const downEvent = new PointerEvent('pointerdown', {
         clientX: 100,
@@ -147,7 +147,7 @@ describe('ResizableColumnDirective', () => {
       tick();
       fixture.detectChanges();
 
-      expect(hostComponent.resizeEvent).toBeTruthy();
+      expect(spy).toHaveBeenCalledWith(moveEvent);
     }));
 
     it('should emit resizeEnd on pointerup', fakeAsync(() => {

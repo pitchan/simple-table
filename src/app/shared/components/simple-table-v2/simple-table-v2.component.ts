@@ -7,7 +7,6 @@ import {
   ElementRef,
   EventEmitter,
   Input,
-  NgZone,
   OnChanges,
   OnDestroy,
   OnInit,
@@ -96,7 +95,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   private readonly destroyRef = inject(DestroyRef);
   private readonly elementRef = inject(ElementRef);
   private readonly renderer = inject(Renderer2);
-  private readonly ngZone = inject(NgZone);
   private readonly resizeService = inject(TableResizeService);
 
   /** Flag to track if AfterViewInit has been called */
