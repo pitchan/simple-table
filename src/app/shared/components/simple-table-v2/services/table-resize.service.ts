@@ -107,6 +107,18 @@ export class TableResizeService {
   /** Original table width (for expand mode) */
   private originalTableWidth: number = 0;
 
+  /** Cached container element for onDragMove() (set in beginResize) */
+  private cachedContainer: HTMLElement | null = null;
+
+  /** Cached helper element for onDragMove() (set in beginResize) */
+  private cachedHelper: HTMLElement | null = null;
+
+  /** Last pointer move event for rAF throttle */
+  private lastMoveEvent: PointerEvent | null = null;
+
+  /** requestAnimationFrame ID for throttle */
+  private rafId: number | null = null;
+
   constructor() {
     this.renderer = this.rendererFactory.createRenderer(null, null);
   }
@@ -195,6 +207,10 @@ export class TableResizeService {
     // Add resize cursor to body
     DomHandler.addClass(this.document.body, 'column-resizing');
 
+    // Cache refs for onDragMove() (called outside Angular zone by directive)
+    this.cachedContainer = containerElement;
+    this.cachedHelper = helperElement;
+
     return {
       columnIndex,
       startWidth: columnWidth
@@ -268,6 +284,29 @@ export class TableResizeService {
   ): void {
     if (!this.state.active) return;
     this.updateHelperPosition(event, containerElement, helperElement);
+  }
+
+  /**
+   * Handle drag move - called DIRECTLY by directive, OUTSIDE Angular zone.
+   * Uses requestAnimationFrame to cap helper position updates at 60fps.
+   * This replaces the old pattern: directive -> @Output -> component -> service.
+   * @param event - The pointer event from the drag
+   */
+  onDragMove(event: PointerEvent): void {
+    if (!this.state.active) return;
+
+    // Store the latest event (most recent wins)
+    this.lastMoveEvent = event;
+
+    // Throttle with rAF: if a frame is already scheduled, skip
+    if (this.rafId === null) {
+      this.rafId = requestAnimationFrame(() => {
+        this.rafId = null;
+        if (this.lastMoveEvent && this.cachedContainer && this.cachedHelper) {
+          this.updateHelperPosition(this.lastMoveEvent, this.cachedContainer, this.cachedHelper);
+        }
+      });
+    }
   }
 
   /**
@@ -467,6 +506,17 @@ export class TableResizeService {
     // Remove cursor class
     DomHandler.removeClass(this.document.body, 'column-resizing');
     
+    // Cancel any pending rAF
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+
+    // Reset drag caches
+    this.cachedContainer = null;
+    this.cachedHelper = null;
+    this.lastMoveEvent = null;
+
     // Reset state
     this.state = {
       active: false,
