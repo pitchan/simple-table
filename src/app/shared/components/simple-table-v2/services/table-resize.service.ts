@@ -457,7 +457,7 @@ export class TableResizeService {
     }
 
     // Apply to body cells (td) - each row
-    const bodyRows = DomHandler.find(tableElement, 'tbody tr');
+    /*const bodyRows = DomHandler.find(tableElement, 'tbody tr');
     bodyRows.forEach(row => {
       const cells = DomHandler.find(row, 'td');
       cells.forEach((td, index) => {
@@ -468,7 +468,7 @@ export class TableResizeService {
           this.renderer.setStyle(td, 'max-width', width);
         }
       });
-    });
+    });*/
 
     // Apply to footer cells if present (tfoot)
     const footerRows = DomHandler.find(tableElement, 'tfoot tr');
