@@ -223,6 +223,10 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     this.strategy.initialize(this.data);
     this.connectStrategy();
     this.viewInitialized = true;
+
+    // Apply initial column widths on TH elements (DOM is ready now)
+    this.applyInitialWidths();
+
     this.cdr.markForCheck();
 
     if (this.debug) {
@@ -306,9 +310,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       const width = col.width?.initial ?? this.getDefaultWidthForType(col.type ?? 'text');
       this.columnWidths.set(col.id, width);
     });
-
-    // Apply CSS vars to wrapper (directive will update during drag)
-    this.applyColumnWidthsToHost();
 
     if (this.debug) {
       console.log('[SimpleTableV2] Columns initialized:', this.displayedColumns);
@@ -507,58 +508,54 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     return index;
   }
 
-  /**
-   * Get column styles using CSS custom properties
-   * Clean pattern: Angular injects the value, CSS does the rest
-   */
-  getColumnStyles(columnId: string): { [key: string]: string } {
-    const column = this.getColumn(columnId);
-    const columnType = column?.type ?? 'text';
-    const defaultWidths = DEFAULT_COLUMN_WIDTHS[columnType as keyof typeof DEFAULT_COLUMN_WIDTHS] 
-      ?? DEFAULT_COLUMN_WIDTHS['text'];
-    
-    const minWidth = column?.width?.min ?? defaultWidths.min;
-    const maxWidth = column?.width?.max ?? defaultWidths.max;
-    
-    return {
-      width: `var(--column-${columnId}-width, auto)`,
-      'min-width': `${minWidth}px`,
-      'max-width': `${maxWidth}px`
-    };
-  }
-
-  // ========== COLUMN WIDTH CSS VARS ==========
+  // ========== COLUMN WIDTH MANAGEMENT ==========
 
   /**
    * Get the wrapper element (cached for performance)
-   * Targets the same element as the directive for consistency
    */
   private getWrapper(): HTMLElement | null {
     return this.wrapperEl ??= this.elementRef.nativeElement.querySelector('.simple-table-v2-container');
   }
 
   /**
-   * Apply CSS vars for column widths on the wrapper element
-   * Called at init and after resize end (not during drag - directive handles that)
+   * Apply initial column widths directly on TH elements.
+   * Called once in ngAfterViewInit when the DOM is ready.
+   * With table-layout: fixed, TH widths propagate to all TD cells automatically.
    */
-  private applyColumnWidthsToHost(): void {
-    const wrapper = this.getWrapper();
-    if (!wrapper) return;
+  private applyInitialWidths(): void {
+    const tableEl = this.getTableElement();
+    if (!tableEl) return;
 
-    // Clear existing column CSS vars (avoids "ghosts" if columns change)
-    Array.from(wrapper.style).forEach((prop: string) => {
-      if (prop.startsWith('--column-')) {
-        this.renderer.removeStyle(wrapper, prop);
+    const headerRow = tableEl.querySelector('tr.mat-header-row') as HTMLElement;
+    if (!headerRow) return;
+
+    const headers = Array.from(headerRow.querySelectorAll('th')) as HTMLElement[];
+
+    // Build widths array matching displayedColumns order
+    const widths: { width: number; min: number; max: number }[] = [];
+    this.displayedColumns.forEach((colId) => {
+      if (colId === 'select') {
+        widths.push({ width: 48, min: 48, max: 48 });
+      } else if (colId === 'configButton') {
+        widths.push({ width: 48, min: 48, max: 48 });
+      } else {
+        const col = this.getColumn(colId);
+        const w = this.columnWidths.get(colId) ?? this.getDefaultWidthForType(col?.type ?? 'text');
+        widths.push({ width: w, min: this.getMinWidth(colId), max: this.getMaxWidth(colId) });
       }
     });
 
-    // Apply all column widths
-    this.columnWidths.forEach((width, columnId) => {
-      this.renderer.setStyle(wrapper, `--column-${columnId}-width`, `${width}px`);
+    // Apply styles on each TH
+    headers.forEach((th, index) => {
+      if (widths[index] !== undefined) {
+        this.renderer.setStyle(th, 'width', `${widths[index].width}px`);
+        this.renderer.setStyle(th, 'min-width', `${widths[index].min}px`);
+        this.renderer.setStyle(th, 'max-width', `${widths[index].max}px`);
+      }
     });
 
     if (this.debug) {
-      console.log('[SimpleTableV2] CSS vars applied to wrapper:', this.columnWidths.size, 'columns');
+      console.log('[SimpleTableV2] Initial widths applied to', headers.length, 'TH elements');
     }
   }
 

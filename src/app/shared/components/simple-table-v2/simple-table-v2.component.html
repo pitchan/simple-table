@@ -70,7 +70,6 @@
           [class.sticky-column-end]="column.sticky === 'end'"
           [class.p-resizable-column]="resizableColumnsEnabled && column.resizable !== false"
           [attr.data-column]="column.id"
-          [ngStyle]="getColumnStyles(column.id)"
           pResizableColumn
           [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false"
           (resizeBegin)="onColumnResizeBegin($event)"

@@ -272,21 +272,6 @@ export class TableResizeService {
   }
 
   /**
-   * Handle the resize operation (called on pointer move)
-   * @param event - The pointer event
-   * @param containerElement - The table container element
-   * @param helperElement - The resize helper indicator element
-   */
-  onResize(
-    event: PointerEvent,
-    containerElement: HTMLElement,
-    helperElement: HTMLElement
-  ): void {
-    if (!this.state.active) return;
-    this.updateHelperPosition(event, containerElement, helperElement);
-  }
-
-  /**
    * Handle drag move - called DIRECTLY by directive, OUTSIDE Angular zone.
    * Uses requestAnimationFrame to cap helper position updates at 60fps.
    * This replaces the old pattern: directive -> @Output -> component -> service.
