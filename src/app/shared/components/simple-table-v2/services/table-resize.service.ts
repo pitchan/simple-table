@@ -455,34 +455,6 @@ export class TableResizeService {
         }
       });
     }
-
-    // Apply to body cells (td) - each row
-    /*const bodyRows = DomHandler.find(tableElement, 'tbody tr');
-    bodyRows.forEach(row => {
-      const cells = DomHandler.find(row, 'td');
-      cells.forEach((td, index) => {
-        if (this.columnWidths[index] !== undefined) {
-          const width = `${this.columnWidths[index]}px`;
-          this.renderer.setStyle(td, 'width', width);
-          this.renderer.setStyle(td, 'min-width', width);
-          this.renderer.setStyle(td, 'max-width', width);
-        }
-      });
-    });*/
-
-    // Apply to footer cells if present (tfoot)
-    const footerRows = DomHandler.find(tableElement, 'tfoot tr');
-    footerRows.forEach(row => {
-      const cells = DomHandler.find(row, 'td');
-      cells.forEach((td, index) => {
-        if (this.columnWidths[index] !== undefined) {
-          const width = `${this.columnWidths[index]}px`;
-          this.renderer.setStyle(td, 'width', width);
-          this.renderer.setStyle(td, 'min-width', width);
-          this.renderer.setStyle(td, 'max-width', width);
-        }
-      });
-    });
   }
 
   /**
