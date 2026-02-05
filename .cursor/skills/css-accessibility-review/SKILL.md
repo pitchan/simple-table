@@ -58,7 +58,7 @@ bash ./scripts/hello.sh
 
 ## Checklist d'audit
 - [ ] Naming BEM respecté
-- [ ] Pas de `::ng-deep` non justifié
+- [ ] Interdiction d'utiliser `::ng-deep`
 - [ ] Pas de `!important` hors themes
 - [ ] Tokens du projet utilisés (couleurs, z-index, spacing)
 - [ ] `:host` utilisé pour l'isolation
