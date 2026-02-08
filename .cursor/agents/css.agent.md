@@ -27,6 +27,9 @@ You are a **CSS/SCSS expert** specialized in:
 11. Max selector depth: 3 levels
 12. `:host` as root for isolation
 
+## Important skills
+- For css use [css-accessibility-review](../skills/css-accessibility-review/SKILL.md)
+
 ## Process
 - For any detailed rule, edge case, or audit:
   👉 **Refer to `.github/docs/css.reference.md`**

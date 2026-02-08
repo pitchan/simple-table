@@ -1,0 +1,65 @@
+<div class="home">
+  <!-- Header -->
+  <app-header></app-header>
+
+  <!-- Contenu principal -->
+  <main class="home__main" role="main">
+    <div class="home__container">
+      <!-- Titre de section -->
+      <section class="home__hero" aria-labelledby="home-title">
+        <h1 id="home-title" class="home__title">Tableau de bord des employés</h1>
+        <p class="home__subtitle">
+          Vue d'ensemble des collaborateurs — composant
+          <strong>SimpleTableV2</strong> générique typé
+          <code>&lt;Employee&gt;</code>.
+        </p>
+
+        <!-- Statistiques rapides -->
+        <div class="home__stats" role="region" aria-label="Statistiques clés">
+          <div class="home__stat-card">
+            <span class="home__stat-value">{{ employees.length }}</span>
+            <span class="home__stat-label">Employés</span>
+          </div>
+          <div class="home__stat-card">
+            <span class="home__stat-value">{{ activesCount }}</span>
+            <span class="home__stat-label">Actifs</span>
+          </div>
+          <div class="home__stat-card">
+            <span class="home__stat-value">{{ departmentsCount }}</span>
+            <span class="home__stat-label">Départements</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- État de chargement -->
+      <p *ngIf="loading" class="home__loading" role="status" aria-live="polite">
+        Chargement des données en cours…
+      </p>
+
+      <!-- Message d'erreur -->
+      <p *ngIf="errorMessage" class="home__error" role="alert">
+        {{ errorMessage }}
+      </p>
+
+      <!-- Table générique SimpleTableV2<Employee> -->
+      <section
+        *ngIf="!loading && !errorMessage"
+        class="home__table-section"
+        aria-labelledby="table-heading">
+        <h2 id="table-heading" class="sr-only">Liste des employés</h2>
+
+        <div class="home__table-wrapper">
+          <app-simple-table-v2
+            [data]="employees"
+            [config]="tableConfig"
+            (rowClick)="onRowClick($event)"
+            (hyperlinkClick)="onHyperlinkClick($event)">
+          </app-simple-table-v2>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <app-footer></app-footer>
+</div>
