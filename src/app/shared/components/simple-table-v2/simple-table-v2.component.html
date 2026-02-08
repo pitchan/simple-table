@@ -1,4 +1,5 @@
 <div class="simple-table-v2-container" 
+     [style.height.px]="computedHeight"
      [class.loading]="isLoading"
      [class.p-datatable-resizable]="resizableColumnsEnabled"
      [class.p-datatable-resizable-fit]="resizableColumnsEnabled && columnResizeMode === 'fit'"
@@ -13,7 +14,8 @@
     Is Loading: {{ isLoading }}<br>
     Data Source Type: {{ data ? data.constructor.name : 'undefined' }}<br>
     Resize Mode: {{ columnResizeMode }}<br>
-    Is Resizing: {{ isResizing }}
+    Is Resizing: {{ isResizing }}<br>
+    Computed Height: {{ computedHeight }}px
   </div>
 
   <!-- Resize Helper Indicator (PrimeNG-style vertical line during resize) -->

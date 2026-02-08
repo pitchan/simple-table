@@ -5,7 +5,7 @@ $resize-helper-color: #2196f3;
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  // height: 100%; -- supprimé, piloté par [style.height.px]="computedHeight"
   overflow: hidden;
   background: white;
 
@@ -85,14 +85,12 @@ $resize-helper-color: #2196f3;
 }
 
 .table-wrapper {
-  flex: 1;
-  overflow: auto;
+  flex: 1 1 0;        // Prend tout l'espace restant dans le flex column
+  min-height: 0;      // CRUCIAL : permet à overflow de fonctionner dans un flex child
+  overflow-y: auto;   // Scroll vertical INTERNE (pas la page)
+  overflow-x: auto;   // Scroll horizontal si expand mode
   position: relative;
 
-  &.sticky-header {
-    // Height handling is crucial for sticky headers
-    max-height: 100%; 
-  }
 }
 
 table.simple-table-v2 {
@@ -215,7 +213,8 @@ td.mat-cell {
   font-size: 12px;
 }
 
-// Footer
+// Footer — toujours visible au sein du composant (en bas du flex column).
+// Pas de position: sticky : inutile avec un conteneur à hauteur fixe + flex column.
 .table-footer-container {
   display: flex;
   align-items: center;
@@ -224,7 +223,8 @@ td.mat-cell {
   background: white;
   min-height: 56px;
   padding: 0 16px;
-  z-index: 5; // Ensure above content
+  flex-shrink: 0;     // Ne jamais compresser le footer
+  z-index: 5;
 
   .table-actions {
     flex: 1;

@@ -41,6 +41,10 @@ export class TestTableComponent implements OnInit {
 
   tableConfig: TableConfig<User> = {
     id: 'test-users-table',
+    height: {
+      maxHeight: 2000,
+      minHeight: 600,
+    },
     columns: [
       {
         id: 'name',

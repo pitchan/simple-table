@@ -139,6 +139,36 @@ export interface TableFeatures {
 export type ColumnResizeMode = 'fit' | 'expand';
 
 /**
+ * Configuration de la hauteur dynamique de la table.
+ *
+ * La hauteur est calculée via : computedHeight = min(parentHeight, maxHeight).
+ * La table ne déborde jamais de son parent.
+ *
+ * `minHeight` est une **recommandation** (warning debug si le parent fournit moins),
+ * pas une contrainte absolue.
+ */
+export interface TableHeightConfig {
+  /**
+   * Hauteur maximale en px (défaut : 2000).
+   * Empêche la table de devenir excessivement haute.
+   */
+  maxHeight?: number;
+  /**
+   * Hauteur minimale recommandée en px (défaut : 600).
+   * Valeur indicative : si le parent fournit moins, la table
+   * s'adapte à la hauteur du parent sans déborder.
+   * Un warning est émis en mode debug si parentHeight < minHeight.
+   */
+  minHeight?: number;
+}
+
+/** Valeurs par défaut pour la configuration de hauteur */
+export const DEFAULT_TABLE_HEIGHT: Required<TableHeightConfig> = {
+  minHeight: 600,
+  maxHeight: 2000,
+};
+
+/**
  * Table configuration
  */
 export interface TableConfig<T = any> {
@@ -175,6 +205,9 @@ export interface TableConfig<T = any> {
 
   /** Enable/disable column resizing globally (default: true) */
   resizableColumns?: boolean;
+
+  /** Configuration de la hauteur dynamique */
+  height?: TableHeightConfig;
 }
 
 /**

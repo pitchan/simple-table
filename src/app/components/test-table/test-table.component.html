@@ -4,7 +4,7 @@
 
   <p *ngIf="loading" class="loading-message">Chargement en cours…</p>
   <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
-  <div *ngIf="!loading && !errorMessage" class="table-wrapper mat-elevation-z8">
+  <div *ngIf="!loading && !errorMessage" class="table-host mat-elevation-z8">
     <app-simple-table-v2
       [data]="users"
       [config]="tableConfig"

@@ -1,19 +1,31 @@
+// Layout flex column : le h2/p prennent leur place, .table-host remplit le reste.
+// Plus de calc() magique — le ResizeObserver mesure .table-host et la table s'adapte.
+//
+// min-height (pas height) : permet au contenu de pousser quand la table
+// enforce son minHeight et que le viewport est trop petit → la page scrolle.
+//
+// Pas de overflow: hidden — les parents ne doivent PAS clipper.
+// La table gère son propre scroll interne (overflow: hidden + overflow-y: auto).
 .test-table-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   padding: 20px;
-  
-  h2 {
-    margin-bottom: 16px;
+  box-sizing: border-box;
+  gap: 16px;
+
+  h2, p {
+    margin: 0;
+    flex-shrink: 0;
     color: #333;
   }
-  
+
   p {
-    margin-bottom: 24px;
     color: #666;
   }
 
   .loading-message {
     font-style: italic;
-    color: #666;
   }
 
   .error-message {
@@ -22,8 +34,15 @@
   }
 }
 
-.table-wrapper {
+// Conteneur dédié à la table — prend tout l'espace restant.
+// Nommé .table-host (et non .table-wrapper) pour éviter toute collision
+// avec le .table-wrapper interne au composant simple-table-v2.
+//
+// Pas de overflow: hidden — permet à la table d'enforcer minHeight
+// sans être coupée quand le viewport est petit.
+.table-host {
+  flex: 1 1 0;
+  min-height: 0;
   background: white;
   border-radius: 4px;
-  overflow: hidden;
 }
