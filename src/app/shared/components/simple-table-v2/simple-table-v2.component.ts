@@ -555,7 +555,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     const tableEl = this.getTableElement();
     if (!tableEl) return;
 
-    const headerRow = tableEl.querySelector('tr.mat-header-row') as HTMLElement;
+    const headerRow = tableEl.querySelector('thead tr') as HTMLElement;
     if (!headerRow) return;
 
     const headers = Array.from(headerRow.querySelectorAll('th')) as HTMLElement[];
@@ -625,7 +625,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     });
 
     // Initialize column widths from current DOM state
-    const headerRow = tableEl.querySelector('tr.mat-header-row') as HTMLElement;
+    const headerRow = tableEl.querySelector('thead tr') as HTMLElement;
     if (headerRow) {
       this.resizeService.initializeWidths(tableEl, headerRow);
     }
