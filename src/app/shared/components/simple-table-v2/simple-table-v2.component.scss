@@ -5,7 +5,7 @@ $resize-helper-color: #2196f3;
   position: relative;
   display: flex;
   flex-direction: column;
-  // height: 100%; -- supprimé, piloté par [style.height.px]="computedHeight"
+  height: 100%; // -- supprimé, piloté par [style.height.px]="computedHeight"
   overflow: hidden;
   background: white;
 

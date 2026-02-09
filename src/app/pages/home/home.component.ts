@@ -8,7 +8,6 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
-import { MatTableDataSource } from '@angular/material/table';
 import { delay, of } from 'rxjs';
 
 import { SimpleTableV2Component } from '../../shared/components/simple-table-v2/simple-table-v2.component';
@@ -77,8 +76,8 @@ export class HomeComponent implements OnInit {
     id: 'home-employees-table',
     columns: this.buildColumns(),
     height: {
-      maxHeight: 800,
-      minHeight: 500,
+      //maxHeight: 800,
+      //minHeight: 1000,
     },
     features: {
       sort: true,
