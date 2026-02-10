@@ -17,6 +17,7 @@ import {
   Signal,
   SimpleChanges,
   ViewChild,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -183,11 +184,14 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
   // ========== PUBLIC STATE (synced from strategy) ==========
   /** Current page data - updated only when strategy emits */
-  tableData: T[] = [];
+  //tableData: T[] = [];
   /** Total count for paginator - updated only when strategy emits */
-  totalCount = 0;
+  //totalCount = 0;
 
-  loading: Signal<boolean> = signal(false);
+  /** Loading state (signal synchronized from strategy) */
+  readonly loading = computed(() => this.strategy.loading());
+  tableData = computed(() => this.strategy.data());
+  totalCount = computed(() => this.strategy.totalCount());
 
   // ========== DISPLAY STATE ==========
   displayedColumns: string[] = [];
@@ -241,8 +245,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       
       // Reinitialize strategy with new data
       this.strategy.initialize(newData);
-      // Sync state immediately for instant UI update
-      this.syncFromStrategy();
     }
   }
 
@@ -259,8 +261,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     this.strategy.initialize(this.data);
     this.attachPaginatorAndSort();
     this.connectStrategy();
-    // Expose loading$ for async pipe
-    //this.loading$ = this.strategy.loading$;
+    
+
     this.viewInitialized = true;
 
     // Apply initial column widths on TH elements (DOM is ready now)
@@ -399,31 +401,14 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     // Subscribe to data changes
     this.strategy.connect().pipe(
       takeUntilDestroyed(this.destroyRef)
-    ).subscribe(() => {
-      this.syncFromStrategy();
-    });
+    ).subscribe();
 
     if (this.debug) {
       console.log('[SimpleTableV2] Strategy connected');
     }
   }
 
-  /**
-   * Synchronize component state from strategy signals.
-   * Called only when strategy emits new data (not on every change detection cycle).
-   * Note: loading state is now handled via async pipe, no need to sync it here.
-   */
-  private syncFromStrategy(): void {
-    this.tableData = this.strategy.data();
-    this.totalCount = this.strategy.totalCount();
-    this.loading = this.strategy.loading;
-
-    if (this.debug) {
-      console.log('[SimpleTableV2] Data synced:', this.tableData.length);
-    }
-
-    this.cdr.markForCheck();
-  }
+  
 
   // ========== EVENT HANDLERS ==========
   onPageChangeEvent(event: PageEvent): void {
@@ -459,7 +444,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     if (this.isAllSelected()) {
       this.selection.clear();
     } else {
-      this.tableData.forEach(row => this.selection!.select(row));
+      this.tableData().forEach(row => this.selection!.select(row));
     }
     this.selectionChange.emit(this.selection);
   }

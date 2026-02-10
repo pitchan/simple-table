@@ -2,7 +2,7 @@ import { signal, computed, DestroyRef, ChangeDetectorRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort } from '@angular/material/sort';
-import { Observable, distinctUntilChanged, of, tap } from 'rxjs';
+import { Observable, distinctUntilChanged, tap } from 'rxjs';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { ITableStrategy } from '../models/table-strategy.interface';
 
@@ -98,13 +98,14 @@ export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
         this.cdr.markForCheck();
       });
 
-    // Return connect() stream for change detection
-    // FilterableDataSource.connect() returns modelsSubject.asObservable()
-    // distinctUntilChanged() filters redundant emissions
-    return this.dataSource.connect().pipe(
+    // Return modelsSubject as the main data stream
+    // Loading state is now handled independently via async pipe in the component
+    return this.dataSource.modelsSubject.asObservable().pipe(
       takeUntilDestroyed(this.destroyRef),
       distinctUntilChanged(),
-      tap(() => this.cdr.markForCheck())
+      tap(() => {
+        this.cdr.markForCheck();
+      })
     ) as Observable<T[]>;
   }
 

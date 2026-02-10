@@ -7,8 +7,8 @@
   <!-- Debug Info -->
   <div *ngIf="debug" style="background: #f0f0f0; padding: 10px; margin-bottom: 10px;">
     <strong>Debug Info:</strong><br>
-    Rows in tableData: {{ tableData.length }}<br>
-    Total Count: {{ totalCount }}<br>
+    Rows in tableData: {{ tableData().length }}<br>
+    Total Count: {{ totalCount() }}<br>
     Displayed Columns: {{ displayedColumns.join(', ') }}<br>
     Is Loading: {{ loading() }}<br>
     Data Source Type: {{ data ? data.constructor.name : 'undefined' }}<br>
@@ -30,7 +30,7 @@
     <table 
       #tableElement
       mat-table 
-      [dataSource]="tableData" 
+      [dataSource]="tableData()" 
       matSort
       [matSortDisabled]="config.features?.sort === false"
       (matSortChange)="onSortChangeEvent($event)"
@@ -183,7 +183,7 @@
 
     <!-- Paginator (right side) -->
     <mat-paginator
-      [length]="totalCount"
+      [length]="totalCount()"
       [pageSize]="config.defaultPageSize ?? 1000"
       [pageSizeOptions]="config.pageSizeOptions ?? [100, 200, 500, 1000, 2000, 5000]"
       [showFirstLastButtons]="true"

@@ -14,7 +14,7 @@ export interface ITableStrategy<T> {
   /** Total records count (for paginator) */
   readonly totalCount: Signal<number>;
 
-
+  /** Loading state (signal) */
   readonly loading: Signal<boolean>;
 
   /**

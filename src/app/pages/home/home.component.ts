@@ -137,14 +137,6 @@ export class HomeComponent implements OnInit {
   private buildColumns(): TableColumnDef<Employee>[] {
     return [
       {
-        id: 'id',
-        header: '',
-        type: 'selector',
-        sortable: true,
-        accessor: (row) => row.id,
-        width: { min: 60, max: 80, initial: 60 },
-      },
-      {
         id: 'lastName',
         header: 'Nom',
         type: 'link',
