@@ -218,6 +218,16 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    // Handle config changes - reinitialize columns
+    if (changes['config'] && !changes['config'].firstChange) {
+      if (this.debug) {
+        console.log('[SimpleTableV2] Config changed, reinitializing columns', changes['config'].currentValue);
+      }
+      this.initializeColumns();
+      this.initializeConfigEditor();
+      this.cdr.markForCheck();
+    }
+
     // Handle data changes AFTER AfterViewInit
     // Before AfterViewInit, data is initialized in ngAfterViewInit()
     if (changes['data'] && this.viewInitialized && this.strategy) {
