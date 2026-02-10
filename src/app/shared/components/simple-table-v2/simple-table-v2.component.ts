@@ -20,6 +20,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { Observable } from 'rxjs';
 import { MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -183,8 +184,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   tableData: T[] = [];
   /** Total count for paginator - updated only when strategy emits */
   totalCount = 0;
-  /** Loading state - updated only when strategy emits */
-  isLoading = false;
+  /** Loading state (observable) - for async pipe with OnPush */
+  loading$!: Observable<boolean>;
 
   // ========== DISPLAY STATE ==========
   displayedColumns: string[] = [];
@@ -234,10 +235,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   ngAfterViewInit(): void {
-    // IMPORTANT: Order matters for MatTableDataSource!
-    // 1. Attach sort and paginator FIRST
-    // 2. Initialize data SECOND (so combineLatest has all observables)
-    // 3. Connect LAST (to subscribe to the data stream)
+    // IMPORTANT: Initialize strategy first (required for FilterableDataSource),
+    // then attach sort/paginator, then connect to the data stream.
     
     if (this.debug) {
       console.group('[SimpleTableV2] View Init');
@@ -245,9 +244,11 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       console.log('Paginator present:', !!this.paginator);
     }
 
-    this.attachPaginatorAndSort();
     this.strategy.initialize(this.data);
+    this.attachPaginatorAndSort();
     this.connectStrategy();
+    // Expose loading$ for async pipe
+    this.loading$ = this.strategy.loading$;
     this.viewInitialized = true;
 
     // Apply initial column widths on TH elements (DOM is ready now)
@@ -383,6 +384,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   private connectStrategy(): void {
+    // Subscribe to data changes
     this.strategy.connect().pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(() => {
@@ -397,11 +399,11 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   /**
    * Synchronize component state from strategy signals.
    * Called only when strategy emits new data (not on every change detection cycle).
+   * Note: loading state is now handled via async pipe, no need to sync it here.
    */
   private syncFromStrategy(): void {
     this.tableData = this.strategy.data();
     this.totalCount = this.strategy.totalCount();
-    this.isLoading = this.strategy.loading();
 
     if (this.debug) {
       console.log('[SimpleTableV2] Data synced:', this.tableData.length);

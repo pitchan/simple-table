@@ -14,8 +14,10 @@ export interface ITableStrategy<T> {
   /** Total records count (for paginator) */
   readonly totalCount: Signal<number>;
 
-  /** Loading state */
-  readonly loading: Signal<boolean>;
+
+
+  /** Loading state (observable) - for async pipe with OnPush */
+  readonly loading$: Observable<boolean>;
 
   /**
    * Initialize strategy with data source

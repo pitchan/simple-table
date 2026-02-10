@@ -75,10 +75,10 @@ export class HomeComponent implements OnInit {
   tableConfig: TableConfig<Employee> = {
     id: 'home-employees-table',
     columns: this.buildColumns(),
-    height: {
+    /*height: {
       //maxHeight: 800,
       //minHeight: 1000,
-    },
+    },*/
     features: {
       sort: true,
       pagination: true,

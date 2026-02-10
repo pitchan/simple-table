@@ -1,5 +1,5 @@
 <div class="simple-table-v2-container" 
-     [class.loading]="isLoading"
+     [class.loading]="loading$ | async"
      [class.p-datatable-resizable]="resizableColumnsEnabled"
      [class.p-datatable-resizable-fit]="resizableColumnsEnabled && columnResizeMode === 'fit'"
      [class.p-datatable-resizable-expand]="resizableColumnsEnabled && columnResizeMode === 'expand'">
@@ -10,7 +10,7 @@
     Rows in tableData: {{ tableData.length }}<br>
     Total Count: {{ totalCount }}<br>
     Displayed Columns: {{ displayedColumns.join(', ') }}<br>
-    Is Loading: {{ isLoading }}<br>
+    Is Loading: {{ loading$ | async }}<br>
     Data Source Type: {{ data ? data.constructor.name : 'undefined' }}<br>
     Resize Mode: {{ columnResizeMode }}<br>
     Is Resizing: {{ isResizing }}<br>
@@ -21,7 +21,7 @@
   <div #resizeHelper class="p-datatable-column-resize-helper" style="display: none;"></div>
 
   <!-- Loading Overlay -->
-  <div class="loading-overlay" *ngIf="isLoading">
+  <div class="loading-overlay" *ngIf="loading$ | async">
     <mat-spinner diameter="50"></mat-spinner>
   </div>
 
