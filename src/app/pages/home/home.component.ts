@@ -9,6 +9,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { delay, of } from 'rxjs';
+import { SelectionModel } from '@angular/cdk/collections';
 
 import { SimpleTableV2Component } from '../../shared/components/simple-table-v2/simple-table-v2.component';
 import { TableConfig, TableColumnDef } from '../../shared/components/simple-table-v2/models/column-def.model';
@@ -57,6 +58,9 @@ export class HomeComponent implements OnInit {
   /** Message d'erreur éventuel */
   errorMessage: string | null = null;
 
+  /** Modèle de sélection pour les checkboxes */
+  selection = new SelectionModel<Employee>(true, []);
+
   /** Nombre d'employés actifs (calculé) */
   get activesCount(): number {
     return this.employees.filter((e) => e.status === 'active').length;
@@ -82,7 +86,7 @@ export class HomeComponent implements OnInit {
     features: {
       sort: true,
       pagination: true,
-      selection: false,
+      selection: true,
       resize: true,
     },
     defaultPageSize: 100,
@@ -134,8 +138,8 @@ export class HomeComponent implements OnInit {
     return [
       {
         id: 'id',
-        header: '#',
-        type: 'number',
+        header: '',
+        type: 'selector',
         sortable: true,
         accessor: (row) => row.id,
         width: { min: 60, max: 80, initial: 60 },

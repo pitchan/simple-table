@@ -52,6 +52,7 @@
           <app-simple-table-v2
             [data]="employees"
             [config]="tableConfig"
+            [selection]="selection"
             (rowClick)="onRowClick($event)"
             (hyperlinkClick)="onHyperlinkClick($event)">
           </app-simple-table-v2>
