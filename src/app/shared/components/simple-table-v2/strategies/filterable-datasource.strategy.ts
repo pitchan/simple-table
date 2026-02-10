@@ -2,7 +2,7 @@ import { signal, computed, DestroyRef, ChangeDetectorRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort } from '@angular/material/sort';
-import { Observable, distinctUntilChanged, tap } from 'rxjs';
+import { Observable, distinctUntilChanged, of, tap } from 'rxjs';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { ITableStrategy } from '../models/table-strategy.interface';
 

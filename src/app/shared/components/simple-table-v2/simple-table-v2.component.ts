@@ -14,9 +14,11 @@ import {
   OnInit,
   Output,
   Renderer2,
+  Signal,
   SimpleChanges,
   ViewChild,
   inject,
+  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -184,8 +186,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   tableData: T[] = [];
   /** Total count for paginator - updated only when strategy emits */
   totalCount = 0;
-  /** Loading state (observable) - for async pipe with OnPush */
-  loading$!: Observable<boolean>;
+
+  loading: Signal<boolean> = signal(false);
 
   // ========== DISPLAY STATE ==========
   displayedColumns: string[] = [];
@@ -258,7 +260,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     this.attachPaginatorAndSort();
     this.connectStrategy();
     // Expose loading$ for async pipe
-    this.loading$ = this.strategy.loading$;
+    //this.loading$ = this.strategy.loading$;
     this.viewInitialized = true;
 
     // Apply initial column widths on TH elements (DOM is ready now)
@@ -414,6 +416,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   private syncFromStrategy(): void {
     this.tableData = this.strategy.data();
     this.totalCount = this.strategy.totalCount();
+    this.loading = this.strategy.loading;
 
     if (this.debug) {
       console.log('[SimpleTableV2] Data synced:', this.tableData.length);

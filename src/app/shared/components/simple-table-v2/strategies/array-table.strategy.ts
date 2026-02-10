@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort } from '@angular/material/sort';
-import { Observable, distinctUntilChanged, tap } from 'rxjs';
+import { Observable, distinctUntilChanged, of, tap } from 'rxjs';
 import { ITableStrategy, StrategyConfig } from '../models/table-strategy.interface';
 
 /**

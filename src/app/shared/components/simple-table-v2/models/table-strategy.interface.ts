@@ -15,9 +15,7 @@ export interface ITableStrategy<T> {
   readonly totalCount: Signal<number>;
 
 
-
-  /** Loading state (observable) - for async pipe with OnPush */
-  readonly loading$: Observable<boolean>;
+  readonly loading: Signal<boolean>;
 
   /**
    * Initialize strategy with data source
