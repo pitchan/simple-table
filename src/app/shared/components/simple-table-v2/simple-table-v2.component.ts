@@ -439,7 +439,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   masterToggle(): void {
-    if (!this.selection) return;
+    if (!this.selection || !this.isMultipleSelection) return;
 
     if (this.isAllSelected()) {
       this.selection.clear();
@@ -456,6 +456,12 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   // ========== HELPERS ==========
+  
+  /** Détecte si le mode de sélection est 'multiple' via l'API native du SelectionModel */
+  get isMultipleSelection(): boolean {
+    return this.selection?.isMultipleSelection() ?? false;
+  }
+
   private getDefaultWidthForType(type: string): number {
     const widthConfig = DEFAULT_COLUMN_WIDTHS[type as keyof typeof DEFAULT_COLUMN_WIDTHS];
     return widthConfig ? widthConfig.initial : DEFAULT_COLUMN_WIDTHS['text'].initial;

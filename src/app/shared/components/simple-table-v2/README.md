@@ -127,6 +127,72 @@ export class MyComponent {
 | `sortChange` | `EventEmitter<Sort>` | Emitted when sort changes |
 | `pageChange` | `EventEmitter<PageEvent>` | Emitted when page changes |
 
+### Row Selection
+
+Le composant supporte la sélection de lignes via le `SelectionModel` du CDK Angular. L'UI s'adapte automatiquement au mode de sélection configuré.
+
+#### Mode Multiple (plusieurs lignes sélectionnables)
+
+```typescript
+import { SelectionModel } from '@angular/cdk/collections';
+
+@Component({
+  template: `
+    <app-simple-table-v2
+      [data]="employees"
+      [config]="tableConfig"
+      [selection]="selection"
+      (selectionChange)="onSelectionChange($event)">
+    </app-simple-table-v2>
+  `
+})
+export class MyComponent {
+  // true = mode multiple
+  selection = new SelectionModel<Employee>(true, []);
+  
+  onSelectionChange(selection: SelectionModel<Employee>) {
+    console.log('Lignes sélectionnées:', selection.selected);
+  }
+}
+```
+
+**Comportement en mode multiple** :
+- ✅ Checkbox "Select All" visible dans le header
+- ✅ Permet de sélectionner/désélectionner toutes les lignes
+- ✅ Plusieurs lignes peuvent être sélectionnées simultanément
+
+#### Mode Single (une seule ligne sélectionnable)
+
+```typescript
+import { SelectionModel } from '@angular/cdk/collections';
+
+@Component({
+  template: `
+    <app-simple-table-v2
+      [data]="employees"
+      [config]="tableConfig"
+      [selection]="selection"
+      (selectionChange)="onSelectionChange($event)">
+    </app-simple-table-v2>
+  `
+})
+export class MyComponent {
+  // false = mode single
+  selection = new SelectionModel<Employee>(false, []);
+  
+  onSelectionChange(selection: SelectionModel<Employee>) {
+    console.log('Ligne sélectionnée:', selection.selected[0]);
+  }
+}
+```
+
+**Comportement en mode single** :
+- 🚫 Checkbox "Select All" masquée dans le header
+- ✅ Une seule ligne peut être sélectionnée à la fois
+- ✅ Sélectionner une nouvelle ligne désélectionne automatiquement la précédente
+
+> **Note** : Le composant détecte automatiquement le mode via `selection.isMultipleSelection()` et adapte l'UI en conséquence. Aucune configuration supplémentaire n'est nécessaire.
+
 ### TableConfig
 
 ```typescript
