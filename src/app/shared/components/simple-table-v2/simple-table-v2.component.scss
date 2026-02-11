@@ -171,6 +171,11 @@ tr.mat-row, tr.mat-header-row {
 tr.table-row {
   transition: background-color 0.2s;
 
+  // Override Angular Material default row height (52px) for better visual density
+  &.mat-mdc-row {
+    --mat-table-row-item-container-height: 41px;
+  }
+
   &.clickable {
     cursor: pointer;
     &:hover {
@@ -184,18 +189,23 @@ tr.table-row {
 }
 
 // Cells
-td.mat-cell {
-  padding: 0 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+td.mat-mdc-cell {
 
   &.select-column {
     width: 48px;
     padding: 0 8px;
   }
+  .clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  
 }
+
+
 
 // Components in cells
 .cell-link {

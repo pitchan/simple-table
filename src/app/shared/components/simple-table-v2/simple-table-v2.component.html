@@ -94,7 +94,7 @@
           
           <!-- Text/Default Cell -->
           <ng-container *ngIf="!column.type || column.type === 'text' || column.type === 'date' || column.type === 'number' || column.type === 'badge'">
-            <span class="cell-content" [class.badge]="column.type === 'badge'">
+            <span class="cell-content clamp" [class.badge]="column.type === 'badge'">
               {{ getCellValue(row, column) }}
             </span>
           </ng-container>
