@@ -2,6 +2,7 @@ import { Signal } from '@angular/core';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort } from '@angular/material/sort';
 import { Observable } from 'rxjs';
+import { ColumnFilterState } from './column-def.model';
 
 /**
  * Strategy interface for SimpleTableV2 data management
@@ -24,11 +25,11 @@ export interface ITableStrategy<T> {
   initialize(dataSource: any): void;
 
   /**
-   * Connect to data stream
-   * Called in ngAfterViewInit after paginator/sort are available
-   * @returns Observable that emits when data changes
+   * Connect to data stream (optional).
+   * Only needed for strategies that push data via Observable (e.g. FilterableDataSource).
+   * Signal-only strategies (e.g. Array) don't need it: the template reads strategy.data() directly.
    */
-  connect(): Observable<T[]>;
+  connect?(): Observable<T[]>;
 
   /**
    * Cleanup subscriptions
@@ -60,6 +61,26 @@ export interface ITableStrategy<T> {
    * Optional: Manual refresh
    */
   refresh?(): void;
+
+  /**
+   * Optional: Set page (for Array strategy client-side pagination)
+   */
+  setPage?(index: number, size: number): void;
+
+  /**
+   * Optional: Set filters per column (for Array strategy)
+   */
+  setFilters?(filters: Record<string, ColumnFilterState>): void;
+
+  /**
+   * Optional: Set sort state (for Array strategy)
+   */
+  setSort?(active: string | null, direction: 'asc' | 'desc'): void;
+
+  /**
+   * Optional: Get current sort state (for virtual scroll header UI)
+   */
+  getSort?(): { active: string | null; direction: 'asc' | 'desc' };
 }
 
 /**
@@ -69,8 +90,19 @@ export interface StrategyConfig {
   /** Custom sort accessor function for complex data types */
   sortingDataAccessor?: (data: any, sortHeaderId: string) => string | number;
 
-  /** Custom filter predicate */
+  /** Custom filter predicate (legacy: single global filter string) */
   filterPredicate?: (data: any, filter: string) => boolean;
+
+  /**
+   * Adapter: map legacy global filter string to per-column filter state.
+   * Enables screen-by-screen migration without breaking existing filterPredicate usage.
+   */
+  globalFilterAdapter?: (global: string) => Record<string, ColumnFilterState>;
+
+  /**
+   * Apply per-column filters (AND between columns). If not provided, Array strategy uses default text match.
+   */
+  filterApply?: (rows: any[], filtersState: Record<string, ColumnFilterState>) => any[];
 
   /** Enable debug logging */
   debug?: boolean;

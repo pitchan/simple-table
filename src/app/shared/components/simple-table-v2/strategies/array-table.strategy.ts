@@ -1,29 +1,58 @@
 import { signal, computed, DestroyRef, ChangeDetectorRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort } from '@angular/material/sort';
-import { Observable, distinctUntilChanged, tap, of } from 'rxjs';
 import { ITableStrategy, StrategyConfig } from '../models/table-strategy.interface';
+import { ColumnFilterState } from '../models/column-def.model';
+
+/** Sort state for the pipeline */
+export interface SortState {
+  active: string | null;
+  direction: 'asc' | 'desc';
+}
+
+/** Page state for client-side slice */
+export interface PageState {
+  index: number;
+  size: number;
+}
 
 /**
  * Strategy for simple array data (T[])
- * Uses MatTableDataSource for client-side sorting/pagination/filtering
+ * Uses a signals-based pipeline: rows → filter → sort → slice → displayRows.
+ * No MatTableDataSource; paginator and sort are "unplugged" and driven via signals.
  */
 export class ArrayTableStrategy<T> implements ITableStrategy<T> {
-  private dataSource = new MatTableDataSource<T>([]);
   private paginatorInstance?: MatPaginator;
   private sortInstance?: MatSort;
 
-  // Internal signals
-  private _data = signal<T[]>([]);
-  private _totalCount = signal(0);
-  private _loading = signal(false);
+  // Raw state
+  private readonly rowsSig = signal<T[]>([]);
+  private readonly filtersSig = signal<Record<string, ColumnFilterState>>({});
+  private readonly sortSig = signal<SortState>({ active: null, direction: 'asc' });
+  private readonly pageSig = signal<PageState>({ index: 0, size: 50 });
 
-  // Public readonly signals
-  readonly data = computed(() => this._data());
-  readonly totalCount = computed(() => this._totalCount());
-  readonly loading = computed(() => this._loading());
+  // Pipeline: filtered + sorted (full list)
+  private readonly filteredSortedSig = computed(() => {
+    const rows = this.rowsSig();
+    const filters = this.filtersSig();
+    const sort = this.sortSig();
+    const filtered = this.applyFilters(rows, filters);
+    return this.applySort(filtered, sort);
+  });
+
+  // Display: sliced page for mat-table
+  private readonly displayRows = computed(() => {
+    const all = this.filteredSortedSig();
+    const page = this.pageSig();
+    const start = page.index * page.size;
+    return all.slice(start, start + page.size);
+  });
+
+  // Public API (ITableStrategy)
+  readonly data = computed(() => this.displayRows());
+  readonly totalCount = computed(() => this.filteredSortedSig().length);
+  readonly loading = computed(() => false);
 
   constructor(
     private destroyRef: DestroyRef,
@@ -31,191 +60,157 @@ export class ArrayTableStrategy<T> implements ITableStrategy<T> {
     private config?: StrategyConfig
   ) {}
 
-  /**
-   * Initialize with array data
-   * 
-   * IMPORTANT: This method can be called multiple times:
-   * 1. First call in ngAfterViewInit() after paginator/sort are attached
-   * 2. Subsequent calls from ngOnChanges() when data input changes
-   * 
-   * We synchronize _data immediately for instant UI update, then the
-   * MatTableDataSource observable will update _data with paginated results.
-   */
   initialize(data: T[]): void {
     if (!Array.isArray(data)) {
       console.error('[ArrayTableStrategy] Expected array, got:', typeof data);
       return;
     }
-
-    // Update MatTableDataSource
-    this.dataSource.data = data;
-    
-    // Synchronize signals immediately for instant UI update
-    // This ensures tableData reflects the new data even before
-    // MatTableDataSource emits through connect()
-    this._totalCount.set(data.length);
-    this._data.set(data);
-    
-    // Trigger change detection
+    this.rowsSig.set(data);
     this.cdr.markForCheck();
-
-    // Apply custom sorting accessor if provided
-    if (this.config?.sortingDataAccessor) {
-      this.dataSource.sortingDataAccessor = this.config.sortingDataAccessor;
-    } else {
-      this.dataSource.sortingDataAccessor = this.defaultSortingAccessor.bind(this);
-    }
-
-    // Apply custom filter predicate if provided
-    if (this.config?.filterPredicate) {
-      this.dataSource.filterPredicate = this.config.filterPredicate;
-    }
-
     if (this.config?.debug) {
       console.log('[ArrayTableStrategy] Initialized with', data.length, 'rows');
     }
   }
 
-  /**
-   * Connect to MatTableDataSource
-   * Must be called after attachPaginator() and attachSort()
-   */
-  connect(): Observable<T[]> {
-    // Subscribe to MatTableDataSource changes
-    // distinctUntilChanged() filters redundant emissions (e.g., from DOM events like mouseup)
-    return this.dataSource.connect().pipe(
-      takeUntilDestroyed(this.destroyRef),
-      distinctUntilChanged(),
-      tap(data => {
-        this._data.set(data);
-        this.cdr.markForCheck();
-
-        if (this.config?.debug) {
-          console.log('[ArrayTableStrategy] Data updated:', data.length, 'rows');
-        }
-      })
-    );
-  }
-
-  /**
-   * Disconnect from data source
-   */
   disconnect(): void {
-    this.dataSource.disconnect();
+    // No subscriptions to clean here; signals are automatic
   }
 
-  /**
-   * Handle pagination events
-   * MatTableDataSource handles this automatically via paginator
-   */
   onPageChange(event: PageEvent): void {
-    // Just trigger change detection
+    this.setPage(event.pageIndex, event.pageSize);
     this.cdr.markForCheck();
   }
 
-  /**
-   * Handle sort events
-   * MatTableDataSource handles this automatically via sort
-   */
   onSortChange(sort: Sort): void {
-    // Just trigger change detection
+    // Sync from UI; attachSort also pushes via sort.sortChange
+    this.setSort(sort.active || null, (sort.direction as 'asc' | 'desc') || 'asc');
     this.cdr.markForCheck();
   }
 
-  /**
-   * Attach paginator to MatTableDataSource
-   * 
-   * NOTE: Reassigning data forces MatTableDataSource._updateChangeSubscription()
-   * to re-emit via _renderData. This fixes a timing issue where paginator.initialized
-   * has already emitted before we attach, causing combineLatest to block.
-   */
   attachPaginator(paginator: MatPaginator): void {
     this.paginatorInstance = paginator;
-    this.dataSource.paginator = paginator;
-    
-    // Force pipeline update by reassigning data
-    this.dataSource.data = [...this.dataSource.data];
+    const initialIndex = paginator.pageIndex ?? 0;
+    const initialSize = paginator.pageSize ?? 50;
+    this.pageSig.set({ index: initialIndex, size: initialSize });
+    paginator.page.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((event: PageEvent) => {
+      this.setPage(event.pageIndex, event.pageSize);
+      this.cdr.markForCheck();
+    });
   }
 
-  /**
-   * Attach sort to MatTableDataSource
-   * 
-   * NOTE: Reassigning data forces MatTableDataSource._updateChangeSubscription()
-   * to re-emit via _renderData. This fixes a timing issue where sort.initialized
-   * has already emitted before we attach, causing combineLatest to block.
-   */
   attachSort(sort: MatSort): void {
     this.sortInstance = sort;
-    this.dataSource.sort = sort;
-    
-    // Force pipeline update by reassigning data
-    this.dataSource.data = [...this.dataSource.data];
+    sort.sortChange.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((s: Sort) => {
+      this.sortSig.set({
+        active: s.active || null,
+        direction: (s.direction as 'asc' | 'desc') || 'asc',
+      });
+      this.cdr.markForCheck();
+    });
+    // Optional: apply initial sort from MatSort state (active/direction are on the directive instance)
+    const active = (sort as { active?: string }).active;
+    const direction = (sort as { direction?: 'asc' | 'desc' }).direction;
+    if (active != null && direction) {
+      this.sortSig.set({
+        active,
+        direction: direction === 'asc' || direction === 'desc' ? direction : 'asc',
+      });
+    }
   }
 
-  /**
-   * Default sorting accessor with smart type handling
-   * Handles: dates, arrays, objects with 'code' property, strings, numbers
-   */
+  setPage(index: number, size: number): void {
+    this.pageSig.set({ index, size });
+  }
+
+  setFilters(filters: Record<string, ColumnFilterState>): void {
+    this.filtersSig.set(filters ?? {});
+  }
+
+  setSort(active: string | null, direction: 'asc' | 'desc'): void {
+    this.sortSig.set({ active, direction });
+  }
+
+  getSort(): { active: string | null; direction: 'asc' | 'desc' } {
+    return this.sortSig();
+  }
+
+  refresh(): void {
+    this.rowsSig.update((rows) => [...rows]);
+    this.cdr.markForCheck();
+  }
+
+  private applyFilters(rows: T[], filtersState: Record<string, ColumnFilterState>): T[] {
+    if (this.config?.filterApply) {
+      return this.config.filterApply(rows, filtersState);
+    }
+    const activeFilters = Object.entries(filtersState).filter(
+      ([_, state]) => state?.value != null && String(state.value).trim() !== ''
+    );
+    if (activeFilters.length === 0) return rows;
+    return rows.filter((row) => {
+      return activeFilters.every(([colId, state]) => {
+        const value = this.getCellValueForFilter(row, colId);
+        const term = String(state.value).trim().toLowerCase();
+        return value != null && String(value).toLowerCase().includes(term);
+      });
+    });
+  }
+
+  private getCellValueForFilter(row: T, columnId: string): unknown {
+    const accessor = this.config?.sortingDataAccessor;
+    if (accessor) {
+      const v = accessor(row, columnId);
+      return v == null ? '' : v;
+    }
+    const val = (row as Record<string, unknown>)[columnId];
+    return val == null ? '' : val;
+  }
+
+  private applySort(rows: T[], sort: SortState): T[] {
+    const { active, direction } = sort;
+    if (!active || rows.length === 0) return rows;
+    const accessor = this.config?.sortingDataAccessor ?? this.defaultSortingAccessor.bind(this);
+    return [...rows].sort((a, b) => {
+      const aVal = accessor(a, active);
+      const bVal = accessor(b, active);
+      const aNorm = this.normalizeForCompare(aVal);
+      const bNorm = this.normalizeForCompare(bVal);
+      if (aNorm < bNorm) return direction === 'asc' ? -1 : 1;
+      if (aNorm > bNorm) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  private normalizeForCompare(value: string | number): string | number {
+    if (value == null) return '';
+    if (typeof value === 'string') return value.trim().toLowerCase();
+    return value;
+  }
+
   private defaultSortingAccessor(item: T, columnName: string): string | number {
     const value = (item as Record<string, unknown>)[columnName];
-
-    // Handle null/undefined
-    if (value == null) {
-      return '';
-    }
-
-    // Handle Date objects
-    if (value instanceof Date) {
-      return value.getTime();
-    }
-
-    // Handle date strings (columns with 'date' in name)
+    if (value == null) return '';
+    if (value instanceof Date) return value.getTime();
     if (typeof value === 'string' && columnName.toLowerCase().includes('date')) {
       const parsed = Date.parse(value);
-      if (!isNaN(parsed)) {
-        return parsed;
-      }
+      if (!isNaN(parsed)) return parsed;
     }
-
-    // Handle objects with 'code' property (common pattern in this codebase)
     if (typeof value === 'object' && value !== null && 'code' in value) {
-      const codeValue = (value as any).code;
-      return typeof codeValue === 'string' 
-        ? codeValue.trim().toLowerCase() 
+      const codeValue = (value as { code: unknown }).code;
+      return typeof codeValue === 'string'
+        ? codeValue.trim().toLowerCase()
         : String(codeValue).toLowerCase();
     }
-
-    // Handle arrays (extract first element or first element's code)
     if (Array.isArray(value)) {
-      if (value.length === 0) {
-        return '';
+      if (value.length === 0) return '';
+      const first = value[0];
+      if (typeof first === 'object' && first !== null && 'code' in first) {
+        return String((first as { code: unknown }).code).toLowerCase();
       }
-      const firstElement = value[0];
-      if (typeof firstElement === 'object' && firstElement !== null && 'code' in firstElement) {
-        return String(firstElement.code).toLowerCase();
-      }
-      return String(firstElement).toLowerCase();
+      return String(first).toLowerCase();
     }
-
-    // Handle strings (case-insensitive)
-    if (typeof value === 'string') {
-      return value.trim().toLowerCase();
-    }
-
-    // Handle numbers and booleans
-    if (typeof value === 'number' || typeof value === 'boolean') {
-      return value as number;
-    }
-
-    // Fallback: stringify
+    if (typeof value === 'string') return value.trim().toLowerCase();
+    if (typeof value === 'number' || typeof value === 'boolean') return value as number;
     return String(value).toLowerCase();
-  }
-
-  /**
-   * Refresh data (for array strategy, this means re-initializing)
-   */
-  refresh(): void {
-    const currentData = this.dataSource.data;
-    this.initialize(currentData);
   }
 }

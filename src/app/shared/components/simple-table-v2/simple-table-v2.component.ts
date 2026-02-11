@@ -34,6 +34,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslateModule } from '@ngx-translate/core';
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { SelectionModel } from '@angular/cdk/collections';
 import { DataSource } from '@angular/cdk/collections';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
@@ -92,7 +93,8 @@ import { DomHandler } from './helpers/dom-handler';
     MatProgressSpinnerModule,
     TranslateModule,
     ResizableColumnDirective,
-    TableConfigEditorComponent
+    TableConfigEditorComponent,
+    ScrollingModule
   ],
   providers: [TableResizeService],
 })
@@ -178,6 +180,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild('resizeHelper') resizeHelper!: ElementRef<HTMLDivElement>;
   @ViewChild('tableElement', { read: ElementRef }) tableElementRef!: ElementRef<HTMLTableElement>;
+  @ViewChild('gridTableElement', { read: ElementRef }) gridTableElementRef!: ElementRef<HTMLElement>;
 
   // ========== STRATEGY (internal) ==========
   private strategy!: ITableStrategy<T>;
@@ -368,6 +371,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       {
         debug: this.debug,
         sortingDataAccessor: this.customSortingAccessor.bind(this),
+        globalFilterAdapter: this.config?.globalFilterAdapter,
+        filterApply: this.config?.filterApply,
       }
     );
 
@@ -398,11 +403,11 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   private connectStrategy(): void {
-    // Subscribe to data changes
-    this.strategy.connect().pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe();
-
+    if (this.strategy.connect) {
+      this.strategy.connect().pipe(
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe();
+    }
     if (this.debug) {
       console.log('[SimpleTableV2] Strategy connected');
     }
@@ -434,7 +439,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   isAllSelected(): boolean {
     if (!this.selection) return false;
     const numSelected = this.selection.selected.length;
-    const numRows = this.tableData.length;
+    const numRows = this.tableData().length;
     return numSelected === numRows && numRows > 0;
   }
 
@@ -543,6 +548,37 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     return index;
   }
 
+  /** Stable trackBy for virtual scroll rows (arrow fn so `this` is bound when used as callback). */
+  trackByRow = (index: number, row: T): string | number => {
+    const config = this.config;
+    if (config?.rowIdAccessor) return config.rowIdAccessor(row);
+    const r = row as Record<string, unknown>;
+    if (r != null && typeof r['id'] !== 'undefined') return r['id'] as string | number;
+    return index;
+  };
+
+  /** Grid template columns string (one value per displayed column). Fallback so grid never gets an empty/invalid value. */
+  gridTemplateColumns(): string {
+    const cols = this.displayedColumns;
+    if (!cols?.length) return '1fr';
+    return cols.map((colId) => this.getColWidthStyle(colId)).join(' ');
+  }
+
+  /** Item size in px for CDK virtual scroll (fixed height per row, V1). */
+  get virtualScrollItemSize(): number {
+    return 48;
+  }
+
+  /** Sort header click when using virtual scroll grid (no MatSort in DOM). */
+  onVirtualSortHeaderClick(columnId: string): void {
+    if (this.config?.features?.sort === false) return;
+    const sort = this.strategy.getSort?.() ?? { active: null, direction: 'asc' as 'asc' | 'desc' };
+    const nextDir = sort.active === columnId && sort.direction === 'asc' ? 'desc' : 'asc';
+    this.strategy.setSort?.(columnId, nextDir);
+    this.sortChange.emit({ active: columnId, direction: nextDir });
+    this.cdr.markForCheck();
+  }
+
   // ========== COLUMN WIDTH MANAGEMENT ==========
 
   /**
@@ -553,45 +589,50 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   /**
-   * Apply initial column widths directly on TH elements.
-   * Called once in ngAfterViewInit when the DOM is ready.
-   * With table-layout: fixed, TH widths propagate to all TD cells automatically.
+   * Apply initial column widths as CSS variables on the container root.
+   * Header and body cells consume width via var(--col-{colId}-w).
    */
   private applyInitialWidths(): void {
-    const tableEl = this.getTableElement();
-    if (!tableEl) return;
+    const container = this.getWrapper();
+    if (!container) return;
 
-    const headerRow = tableEl.querySelector('thead tr') as HTMLElement;
-    if (!headerRow) return;
-
-    const headers = Array.from(headerRow.querySelectorAll('th')) as HTMLElement[];
-
-    // Build widths array matching displayedColumns order
-    const widths: { width: number; min: number; max: number }[] = [];
+    let cumulativeLeft = 0;
     this.displayedColumns.forEach((colId) => {
-      if (colId === 'select') {
-        widths.push({ width: 48, min: 48, max: 48 });
-      } else if (colId === 'configButton') {
-        widths.push({ width: 48, min: 48, max: 48 });
+      let w: number;
+      if (colId === 'select' || colId === 'configButton') {
+        w = 48;
       } else {
         const col = this.getColumn(colId);
-        const w = this.columnWidths.get(colId) ?? this.getDefaultWidthForType(col?.type ?? 'text');
-        widths.push({ width: w, min: this.getMinWidth(colId), max: this.getMaxWidth(colId) });
+        w = this.columnWidths.get(colId) ?? this.getDefaultWidthForType(col?.type ?? 'text');
       }
-    });
-
-    // Apply styles on each TH
-    headers.forEach((th, index) => {
-      if (widths[index] !== undefined) {
-        this.renderer.setStyle(th, 'width', `${widths[index].width}px`);
-        this.renderer.setStyle(th, 'min-width', `${widths[index].min}px`);
-        this.renderer.setStyle(th, 'max-width', `${widths[index].max}px`);
-      }
+      const safe = this.cssSafeColId(colId);
+      this.renderer.setStyle(container, `--col-${safe}-w`, `${w}px`);
+      this.renderer.setStyle(container, `--col-${safe}-left`, `${cumulativeLeft}px`);
+      cumulativeLeft += w;
     });
 
     if (this.debug) {
-      console.log('[SimpleTableV2] Initial widths applied to', headers.length, 'TH elements');
+      console.log('[SimpleTableV2] Initial CSS var widths applied on container');
     }
+  }
+
+  /** Normalize colId for CSS custom property names */
+  private cssSafeColId(colId: string): string {
+    return colId.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '_');
+  }
+
+  /** Return width style for a column (var with fallback so grid always has valid track sizes) */
+  getColWidthStyle(colId: string): string {
+    if (colId === 'select' || colId === 'configButton') return '48px';
+    const safe = this.cssSafeColId(colId);
+    const fallback = this.columnWidths.get(colId) ?? this.getDefaultWidthForType(this.getColumn(colId)?.type ?? 'text');
+    return `var(--col-${safe}-w, ${fallback}px)`;
+  }
+
+  /** Return left offset for sticky columns (used with position: sticky) */
+  getColLeftStyle(colId: string): string {
+    if (colId === 'select' || colId === 'configButton') return '0px';
+    return `var(--col-${this.cssSafeColId(colId)}-left)`;
   }
 
   // ========== COLUMN RESIZE HANDLERS (PrimeNG-style) ==========
@@ -630,8 +671,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       minColumnWidth: this.getMinWidth(this.getColumnIdFromElement(event.element)),
     });
 
-    // Initialize column widths from current DOM state
-    const headerRow = tableEl.querySelector('thead tr') as HTMLElement;
+    // Initialize column widths from current DOM state (table or grid header row)
+    const headerRow = (tableEl.querySelector('thead tr') ?? tableEl.querySelector('.grid-header-row')) as HTMLElement;
     if (headerRow) {
       this.resizeService.initializeWidths(tableEl, headerRow);
     }
@@ -670,15 +711,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
     // Emit event for external persistence if we have a valid result
     if (resizeResult) {
-      // Update internal column widths map
-      const widths = this.resizeService.getColumnWidths();
-      this.visibleColumns.forEach((col, index) => {
-        if (widths[index] !== undefined) {
-          this.columnWidths.set(col.id, widths[index]);
-        }
-      });
+      const byColId = this.resizeService.getColumnWidthsByColId();
+      Object.entries(byColId).forEach(([id, w]) => this.columnWidths.set(id, w));
 
-      // Emit change event
       this.columnWidthChange.emit(resizeResult);
 
       if (this.debug) {
@@ -705,10 +740,12 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
    * Get the table element (cached)
    */
   private getTableElement(): HTMLElement | null {
+    if (this.config?.features?.virtualScroll && this.gridTableElementRef?.nativeElement) {
+      return this.gridTableElementRef.nativeElement;
+    }
     if (this.tableElementRef?.nativeElement) {
       return this.tableElementRef.nativeElement;
     }
-    // Fallback to querySelector if ViewChild not available yet
     return this.tableEl ??= this.elementRef.nativeElement.querySelector('table.simple-table-v2');
   }
 

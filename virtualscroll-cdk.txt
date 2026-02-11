@@ -1,0 +1,340 @@
+Est ce que c'est possibe avec un mattabledatasource et un header sticky d'utiliser le cdk dvirtualscroll de material ? Ma contrainte j'ai un systeme de resize customisé sur mes colonne th de ma table
+
+---
+Oui **c’est possible**, mais **pas “directement”** avec une **`mat-table` + `MatTableDataSource` + `sticky` header** comme on le fait d’habitude.
+
+### Pourquoi c’est compliqué
+
+* `cdk-virtual-scroll-viewport` virtualise des **items de liste** (1 item = 1 ligne typiquement).
+* `mat-table` (surtout avec `MatTableDataSource`, tri, sticky, etc.) repose sur un rendu/table DOM + calculs de sticky via `position: sticky` / CDK Table.
+* Mettre un viewport autour d’un `<table>` **ne virtualise pas proprement** les `<tr>` comme une liste, et le sticky header + scroll container devient vite “cassant”.
+
+### Les options réalistes (de la plus “safe” à la plus “galère”)
+
+#### Option A — Virtual scroll via “table fake” (recommandé si tu veux vraiment du perf)
+
+Tu **n’utilises plus un vrai `<table>`** : tu fais une grille (CSS grid / flex) :
+
+* un header “sticky” (div)
+* un viewport CDK qui rend uniquement les rows visibles (div rows)
+* tes cellules sont des divs alignées
+  ✅ Le sticky header est simple
+  ✅ Virtual scroll nickel
+  ✅ Ton **resize custom sur les `th`** devient du resize sur des “header cells” (div) -> souvent *plus facile*
+  ❌ Tu perds la sémantique `<table>` (accessibilité à refaire proprement)
+
+> Si ta contrainte principale est **“j’ai un resize custom sur mes colonnes”**, cette option est souvent la meilleure : tu contrôles totalement le layout.
+
+#### Option B — Garder `mat-table`, mais virtualiser *à côté* (hack avancé)
+
+Pattern : header “réel” en `mat-table` (sticky), et body virtualisé rendu séparément.
+En gros tu sépares :
+
+* header: `mat-table` avec `matHeaderRowDef` sticky
+* body: `cdk-virtual-scroll-viewport` qui rend des “rows” synchronisées en largeur avec le header
+  ✅ Tu gardes header material/sticky
+  ✅ Virtual scroll pour le body
+  ❌ C’est du **sur-mesure** (sync des largeurs, scroll horizontal, alignement, focus, a11y…)
+  ❌ `MatTableDataSource` ne t’aide plus beaucoup : tu finis souvent avec ton propre data pipeline (sort/filter) + `*cdkVirtualFor`.
+
+#### Option C — Tout en `mat-table` dans un viewport
+
+Tu tentes de mettre `cdk-virtual-scroll-viewport` autour et de virtualiser des `mat-row`.
+➡️ En pratique c’est **instable** (layout table, sticky header, calculs, tailles de lignes, etc.).
+Je le déconseille sauf si tu acceptes des compromis lourds.
+
+---
+
+## Et `MatTableDataSource` dans tout ça ?
+
+* **Avec virtual scroll**, `MatTableDataSource` devient rarement “le bon outil”, parce que tu veux piloter l’affichage via `*cdkVirtualFor`.
+* Tu peux quand même réutiliser **sa logique de filter/sort** *si tu tiens*, mais la plupart finissent par :
+
+  * garder un `signal/observable` `filteredSortedRows$`
+  * et `*cdkVirtualFor="let row of filteredSortedRows$ | async"`
+
+---
+
+## Spécial pour ton resize de colonnes
+
+Si ton resize est basé sur :
+
+* drag handle dans le `th`
+* mise à jour d’une largeur par colonne (`width`, `flex-basis`, CSS vars)
+
+Alors pour que ça marche avec virtual scroll, il te faut **une source unique de vérité de largeur** partagée par :
+
+* header cells
+* body cells (virtualisées)
+
+Le pattern le plus robuste :
+
+* **CSS custom properties** `--col-<id>-w`
+* header: `style.width: var(--col-...)`
+* rows: idem
+* resize: met à jour le style sur le host (ou un service qui pousse un style)
+
+Ça marche très bien en option A (grid) et en option B (header/body séparés).
+
+---
+
+## Conclusion
+
+* **Oui**, possible.
+* **Non**, pas “plug & play” avec `MatTableDataSource + sticky header + cdkVirtualScroll` *dans une mat-table classique*.
+* Avec ton **resize custom**, la voie la plus propre est **Option A (table en div/grid + virtual scroll)**, ou **Option B** si tu veux absolument garder le header `mat-table`.
+
+Si tu me dis :
+
+1. hauteur de ligne fixe ou variable ?
+2. besoin de scroll horizontal ?
+3. combien de lignes max (10k, 100k ?)
+   je te donne un squelette concret (structure HTML + CSS vars + service de widths + virtual scroll).
+
+
+---
+
+
+Je suis entrain de faire un refacto j'avais choisi mattabledatasource car c'est deja comme ca que fonctionne l'application Jai des sorts custom pour les colonnes et des filters custom aussi pour chaque colonne. Peut etre que si je degage ce tabledatasource jaurais moins de soucis avec virtal scroll et resize colonne mais j'ai peur de la quantité de travail pour refacto mon app
+
+---
+
+Je vois très bien le dilemme : **`MatTableDataSource` te donne un “rail”** (filter/sort/paginate) déjà câblé partout, mais **virtual scroll + resize** te force à reprendre le contrôle. Bonne nouvelle : tu n’es pas obligé de “tout jeter” d’un coup.
+
+## Le vrai point clé
+
+Avec **virtual scroll**, tu veux idéalement piloter toi-même la liste affichée (rows) → donc `*cdkVirtualFor`.
+`MatTableDataSource` devient alors surtout :
+
+* soit **un moteur** (filter/sort) que tu réutilises
+* soit **un obstacle** (car il est pensé pour un rendu mat-table “classique”)
+
+Mais tu peux **refacto en 2 temps** sans exploser la charge.
+
+---
+
+## Stratégie “refacto safe” en 2 étapes
+
+### Étape 1 — Garder `mat-table` + sticky, sortir `MatTableDataSource` sans changer l’UI
+
+Objectif : **remplacer la datasource par ton propre pipeline** mais **sans changer le template** (toujours mat-table).
+
+Concrètement :
+
+* tu remplaces `dataSource = new MatTableDataSource()` par un **`Observable<T[]>` ou un `signal<T[]>`** que tu alimentes.
+* tu implémentes :
+
+  * `filtersState` (par colonne)
+  * `sortState` (id + direction + type)
+  * `applyFilters(rows, filtersState)`
+  * `applySort(rows, sortState)` (tes sorts custom existants)
+* et tu binds `dataSource` à un tableau final (ou une DataSource custom CDK simple)
+
+✅ Impact UI minime
+✅ Tu gardes tes filtres/sorts custom tels quels (tu les “appelles” juste dans ton pipeline)
+✅ Tu te rapproches de virtual scroll sans l’activer encore
+
+**Ça te prépare l’étape 2** : virtualiser le rendu.
+
+> En gros : tu ne refacto pas “la table”, tu refacto “le moteur de données”.
+
+---
+
+### Étape 2 — Ajouter virtual scroll (en choisissant A ou B)
+
+Une fois que le moteur est clean, tu peux choisir :
+
+**Option A (recommandée)** : passer en “grid table” (divs) + CDK virtual scroll
+
+* c’est là que resize devient le plus simple/robuste
+* le sticky header devient trivial
+
+**Option B** : header mat-table + body virtualisé (sync des largeurs)
+
+* moins de changement visuel/DOM “header”
+* plus de complexité technique
+
+---
+
+## “J’ai peur de la quantité de travail”
+
+Honnêtement, **sortir `MatTableDataSource`** peut être *moins* de boulot que tu ne penses si tu fais ça intelligemment :
+
+### Ce que tu ne refais pas
+
+* tes fonctions de sort custom → tu les réutilises
+* tes filtres custom par colonne → tu les réutilises
+* tes composants de cellule/édition/boutons/links → inchangés
+
+### Ce que tu refacto vraiment
+
+* l’endroit où tu stockes l’état (filters/sort)
+* la façon dont tu produis `displayRows`
+
+Le gain : derrière, virtual scroll + resize + perf deviennent beaucoup plus simples.
+
+---
+
+## Plan ultra concret (et “KISS”)
+
+1. `rowsInput$` (ou signal) = données brutes
+2. `filtersState` = map `{colId -> filterValue}` (ou objet typé)
+3. `sortState` = `{active, direction, comparatorKey}`
+4. `displayRows$ = combineLatest(rowsInput$, filtersState$, sortState$).pipe(map(apply...))`
+5. (virtual scroll) `*cdkVirtualFor="let row of displayRows$ | async"`
+
+---
+
+## Décision rapide
+
+* Si tu as **> 2–3k lignes** et tu sens déjà que ça rame : **ça vaut le coup** de sortir de `MatTableDataSource`.
+* Si tu as surtout des soucis CSS/resize mais peu de lignes : garde mat-table classique et optimise autrement.
+
+---
+
+Si tu veux, je te donne un “chemin minimal” adapté à ton code actuel :
+
+* tu es plutôt **RxJS observables** ou **signals** pour l’état (filters/sort) ?
+* tes rows sont plutôt 500 / 5k / 50k ?
+
+Je te proposerai la migration la plus courte (avec structure de fichiers + pseudo-code) en gardant ton existant au max.
+---
+
+Mes row sont entre 1000 et 5000 la plupart du temps pour 50000 row paginés au total Je peux faire du signal mais un peu limité car je suis en angular 16 je n'ai donc pas les inputs signal par contre j'ai toSignal et toObservable, signal simple et computed
+
+---
+
+OK, avec **1k–5k rows affichées** (et **50k au total paginées**), tu es exactement dans la zone où :
+
+* **mat-table “classique”** commence à tirer (surtout si tu as cellules riches + resize + sticky)
+* **virtual scroll** devient rentable (tu passes de 5k DOM rows à ~30–80)
+* et **sortir `MatTableDataSource`** te simplifie beaucoup la vie… sans être un refacto monstrueux.
+
+Et Angular 16 est largement suffisant : **signals + computed + toSignal/toObservable** = parfait.
+
+---
+
+## Ce que je te recommande (chemin minimal, peu risqué)
+
+### 1) Garde ton template `mat-table` pour l’instant
+
+Ne touche pas aux `<table mat-table>`, `matSort`, tes `th` resizables, tes cellules, etc.
+
+### 2) Remplace seulement `MatTableDataSource` par un “moteur” maison
+
+L’objectif est de produire `displayRows` (tableau final) depuis :
+
+* `rawRows` (page courante)
+* `filtersState` (par colonne)
+* `sortState` (ton tri custom)
+
+Puis tu alimentes la table avec **un simple tableau**.
+
+> Oui, `mat-table` accepte un tableau direct en `dataSource`.
+
+---
+
+## Pourquoi ça réduit drastiquement le coût de refacto
+
+Parce que tes “custom sorts” et “custom filters” existent déjà : tu vas juste :
+
+* stocker leur état
+* les exécuter dans un `computed()` (ou un `Observable`)
+
+Tu ne réécris pas ta logique, tu la **déplaces**.
+
+---
+
+## Pattern Angular 16 (signals) simple et robuste
+
+### État
+
+* `rowsSig = signal<T[]>([])` (page courante = 1k–5k)
+* `filtersSig = signal<Record<ColId, FilterValue>>({})`
+* `sortSig = signal<{ active: ColId | null; dir: 'asc'|'desc' }>(...)`
+
+### Calcul
+
+* `displayRows = computed(() => applySort(applyFilters(rowsSig(), filtersSig()), sortSig()))`
+
+### Bind
+
+* `[dataSource]="displayRows()"`
+
+Ça te donne :
+
+* un pipeline déterministe
+* zéro `MatTableDataSource`
+* et tu es déjà prêt pour virtual scroll derrière
+
+---
+
+## Et la pagination “50k au total” ?
+
+Tu fais déjà du backend paging => parfait.
+Tu virtualises **uniquement la page affichée** (1k–5k), ce qui est exactement le bon compromis.
+
+---
+
+## Virtual scroll ensuite : le choix le plus “rentable”
+
+Avec ta contrainte **sticky header + resize sur th**, le combo le plus stable est :
+
+### ✅ Option B “hybride” (recommandée pour migration douce)
+
+* **Header** : tu gardes ton header actuel (th resizable + sticky)
+* **Body** : tu rends les rows via `cdk-virtual-scroll-viewport`
+
+Mais (important) : tu ne peux pas virtualiser “proprement” des `<tr>` dans une vraie table.
+Donc en pratique :
+
+* soit tu bascules le body en “div rows” (grid/flex) tout en gardant un header qui ressemble à une table
+* soit tu fais un split header/table et body virtualisé sync (plus dur)
+
+👉 Vu que tu as un resize custom : **grid/flex + CSS vars** est souvent le plus clean.
+
+---
+
+## Migration ultra progressive (zéro big bang)
+
+1. **Sortie de MatTableDataSource** (1–2 jours typiquement selon taille de code)
+
+   * tu gardes UI identique
+   * tu valides que sort/filter/resize/sticky marchent pareil
+
+2. **Introduire CSS vars pour les largeurs** (si pas déjà)
+
+   * un seul “store” de widths
+   * header et cells consomment `var(--col-x-w)`
+
+3. **Activer virtual scroll** sur le body
+
+   * et là tu récupères un gain énorme de perf sans casser ton resize
+
+---
+
+## Petit “piège” à anticiper (et comment l’éviter)
+
+Avec signals + computed, si tu fais filter/sort sur 5k rows à chaque frappe, ça peut coûter.
+Solution simple :
+
+* soit tu **debounce** la mise à jour des filtres (via `toObservable(filtersSig)` + `debounceTime`)
+* soit tu fais un “Apply” button (mais tu n’aimes probablement pas 😄)
+* soit tu n’appliques que sur “stop typing” 150–250ms
+
+---
+
+## Mon conseil final (décision)
+
+✅ Oui, **dégager MatTableDataSource** est le bon move ici :
+
+* ça te simplifie virtual scroll **et** resize
+* et le refacto peut rester contenu si tu fais juste un “moteur” maison en signals
+
+Si tu me donnes en 3 lignes :
+
+* comment tu stockes aujourd’hui tes filters (map ? FormGroup ?)
+* comment tu déclenches tes sorts custom (matSort? comparator par colonne ?)
+* ton resize : tu mets des `style.width.px` sur `th` ? ou CSS vars ?
+
+… je te propose un squelette exact (TypeScript + template) adapté à ton existant, en Angular 16, sans inputs signal.

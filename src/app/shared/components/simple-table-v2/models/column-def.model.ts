@@ -110,6 +110,15 @@ export interface TableState {
 }
 
 /**
+ * Filter state per column (for ArrayTableStrategy pipeline).
+ * Used as Record<colId, ColumnFilterState> in signals.
+ */
+export interface ColumnFilterState {
+  value: any;
+  kind?: 'text' | 'select' | 'dateRange' | 'numberRange';
+}
+
+/**
  * Partial state update (patch)
  */
 export interface TableStatePatch {
@@ -132,6 +141,8 @@ export interface TableFeatures {
   edit?: boolean;
   selection?: boolean;
   pagination?: boolean;
+  /** Use CDK virtual scroll with grid layout (Option A). When true, header and body are divs in a grid. */
+  virtualScroll?: boolean;
 }
 
 /**
@@ -211,6 +222,21 @@ export interface TableConfig<T = any> {
 
   /** Configuration de la hauteur dynamique */
   height?: TableHeightConfig;
+
+  /**
+   * Adapter: map legacy global filter string to per-column filter state (for Array strategy).
+   * Enables screen-by-screen migration without breaking existing filterPredicate usage.
+   */
+  globalFilterAdapter?: (global: string) => Record<string, ColumnFilterState>;
+
+  /**
+   * Apply per-column filters (AND between columns) for Array strategy.
+   * If not provided, default text match is used.
+   */
+  filterApply?: (rows: any[], filtersState: Record<string, ColumnFilterState>) => any[];
+
+  /** Optional: row id accessor for trackBy / selection (e.g. for virtual scroll) */
+  rowIdAccessor?: (row: any) => string | number;
 }
 
 /**

@@ -33,16 +33,18 @@ export interface TableResizeConfig {
 }
 
 /**
- * Internal state during resize operation
+ * Internal state during resize operation (colId-based)
  */
 interface ResizeState {
   active: boolean;
   columnElement: HTMLElement | null;
-  columnIndex: number;
+  columnId: string;
+  nextColumnId: string | null;
   startX: number;
   startWidth: number;
   nextColumnStartWidth: number;
-  initialWidths: number[];
+  initialWidths: Record<string, number>;
+  orderedColumnIds: string[];
   lastHelperX: number;
 }
 
@@ -90,16 +92,18 @@ export class TableResizeService {
   private state: ResizeState = {
     active: false,
     columnElement: null,
-    columnIndex: -1,
+    columnId: '',
+    nextColumnId: null,
     startX: 0,
     startWidth: 0,
     nextColumnStartWidth: 0,
-    initialWidths: [],
+    initialWidths: {},
+    orderedColumnIds: [],
     lastHelperX: 0
   };
 
-  /** Stored column widths (persisted between resizes) */
-  private columnWidths: number[] = [];
+  /** Stored column widths by colId (persisted between resizes) */
+  private columnWidthsByColId: Record<string, number> = {};
 
   /** Table element reference */
   private tableElement: HTMLElement | null = null;
@@ -145,15 +149,25 @@ export class TableResizeService {
     return this.state.active;
   }
 
+  /** Ordered column ids (from header row) for fit-mode next-column and for CSS var application */
+  private orderedColumnIds: string[] = [];
+
   /**
-   * Initialize column widths from the current DOM state
-   * @param tableEl - The table element
-   * @param headerRow - The header row containing TH elements
+   * Initialize column widths from the current DOM state (colId-based).
+   * Supports both table (th) and grid (div with data-column) header rows.
    */
   initializeWidths(tableEl: HTMLElement, headerRow: HTMLElement): void {
     this.tableElement = tableEl;
-    const headers = DomHandler.find(headerRow, 'th');
-    this.columnWidths = headers.map(th => DomHandler.getOuterWidth(th));
+    let headers = DomHandler.find(headerRow, 'th');
+    if (headers.length === 0) {
+      headers = Array.from(headerRow.children) as HTMLElement[];
+    }
+    this.orderedColumnIds = headers.map(el => this.getColumnId(el));
+    this.columnWidthsByColId = {};
+    headers.forEach((el, i) => {
+      const id = this.orderedColumnIds[i];
+      if (id) this.columnWidthsByColId[id] = DomHandler.getOuterWidth(el);
+    });
     this.originalTableWidth = DomHandler.getOuterWidth(tableEl);
   }
 
@@ -170,51 +184,51 @@ export class TableResizeService {
     columnElement: HTMLElement,
     containerElement: HTMLElement,
     helperElement: HTMLElement
-  ): { columnIndex: number; startWidth: number } {
+  ): { columnId: string; startWidth: number } {
     const containerOffset = DomHandler.getOffset(containerElement);
-    const columnIndex = DomHandler.index(columnElement);
+    const columnId = this.getColumnId(columnElement);
     const columnWidth = DomHandler.getOuterWidth(columnElement);
-    
-    // Get next column width for 'fit' mode
+
     const nextColumn = DomHandler.getNextElementSibling(columnElement);
     const nextColumnWidth = nextColumn ? DomHandler.getOuterWidth(nextColumn) : 0;
 
-    // Store all current widths
     if (this.tableElement) {
-      const headerRow = DomHandler.findSingle(this.tableElement, 'thead tr');
+      const headerRow = DomHandler.findSingle(this.tableElement, 'thead tr') ?? this.tableElement.querySelector('.grid-header-row');
       if (headerRow) {
-        const headers = DomHandler.find(headerRow, 'th');
-        this.columnWidths = headers.map(th => DomHandler.getOuterWidth(th));
+        let headers = DomHandler.find(headerRow as HTMLElement, 'th');
+        if (headers.length === 0) headers = Array.from((headerRow as HTMLElement).children) as HTMLElement[];
+        this.orderedColumnIds = headers.map(el => this.getColumnId(el));
+        this.columnWidthsByColId = {};
+        headers.forEach((el, i) => {
+          const id = this.orderedColumnIds[i];
+          if (id) this.columnWidthsByColId[id] = DomHandler.getOuterWidth(el);
+        });
       }
     }
 
-    // Update state
+    const idx = this.orderedColumnIds.indexOf(columnId);
+    const nextColumnId = idx >= 0 && idx < this.orderedColumnIds.length - 1 ? this.orderedColumnIds[idx + 1]! : null;
+
     this.state = {
       active: true,
       columnElement,
-      columnIndex,
+      columnId,
+      nextColumnId,
       startX: event.clientX,
       startWidth: columnWidth,
       nextColumnStartWidth: nextColumnWidth,
-      initialWidths: [...this.columnWidths],
+      initialWidths: { ...this.columnWidthsByColId },
+      orderedColumnIds: [...this.orderedColumnIds],
       lastHelperX: event.clientX - containerOffset.left
     };
 
-    // Position and show helper
     this.updateHelperPosition(event, containerElement, helperElement);
     this.renderer.setStyle(helperElement, 'display', 'block');
-
-    // Add resize cursor to body
     DomHandler.addClass(this.document.body, 'column-resizing');
-
-    // Cache refs for onDragMove() (called outside Angular zone by directive)
     this.cachedContainer = containerElement;
     this.cachedHelper = helperElement;
 
-    return {
-      columnIndex,
-      startWidth: columnWidth
-    };
+    return { columnId, startWidth: columnWidth };
   }
 
   /**
@@ -345,65 +359,47 @@ export class TableResizeService {
   }
 
   /**
-   * Apply resize in 'fit' mode (affects adjacent column)
-   * Uses clamping to ensure both columns respect minimum width
+   * Apply resize in 'fit' mode (affects adjacent column by colId)
    */
   private applyFitResize(
     newColumnWidth: number,
     delta: number,
     tableElement: HTMLElement
   ): ColumnResizeEvent | null {
-    const nextColumn = this.state.columnElement 
-      ? DomHandler.getNextElementSibling(this.state.columnElement)
-      : null;
-    
-    if (!nextColumn) {
-      // Last column - can't resize in fit mode without next column
-      // Fall back to expand behavior for last column
+    if (!this.state.nextColumnId) {
       return this.applyExpandResize(newColumnWidth, delta, tableElement);
     }
 
     const minWidth = this.config.minColumnWidth;
-    
-    // Calculate raw next column width
     let rawNextColumnWidth = this.state.nextColumnStartWidth - delta;
-    
-    // Apply clamping: ensure both columns respect minimum width
     let finalColumnWidth = newColumnWidth;
     let finalNextColumnWidth = rawNextColumnWidth;
     let finalDelta = delta;
-    
-    // If current column would be too small, clamp it
+
     if (finalColumnWidth < minWidth) {
       finalColumnWidth = minWidth;
       finalDelta = finalColumnWidth - this.state.startWidth;
       finalNextColumnWidth = this.state.nextColumnStartWidth - finalDelta;
     }
-    
-    // If next column would be too small, clamp it (and adjust current column accordingly)
     if (finalNextColumnWidth < minWidth) {
       finalNextColumnWidth = minWidth;
-      // Recalculate: the max we can expand current column is limited by next column's minimum
       finalDelta = this.state.nextColumnStartWidth - minWidth;
       finalColumnWidth = this.state.startWidth + finalDelta;
-      
-      // Final safety check: ensure current column is also at least minWidth
       if (finalColumnWidth < minWidth) {
         finalColumnWidth = minWidth;
         finalDelta = finalColumnWidth - this.state.startWidth;
       }
     }
 
-    // Update stored widths
-    this.columnWidths[this.state.columnIndex] = finalColumnWidth;
-    this.columnWidths[this.state.columnIndex + 1] = finalNextColumnWidth;
+    this.columnWidthsByColId[this.state.columnId] = finalColumnWidth;
+    this.columnWidthsByColId[this.state.nextColumnId] = finalNextColumnWidth;
 
-    // Apply widths directly on DOM elements
-    this.applyWidthsToDOM(tableElement);
+    const container = tableElement.closest(this.config.containerSelector) as HTMLElement;
+    if (container) this.applyWidthsToContainer(container);
 
     return {
-      columnId: this.getColumnId(this.state.columnElement!),
-      columnIndex: this.state.columnIndex,
+      columnId: this.state.columnId,
+      columnIndex: this.orderedColumnIds.indexOf(this.state.columnId),
       width: finalColumnWidth,
       nextColumnWidth: finalNextColumnWidth,
       delta: finalDelta
@@ -412,7 +408,6 @@ export class TableResizeService {
 
   /**
    * Apply resize in 'expand' mode (table width changes)
-   * Uses clamping to ensure column respects minimum width
    */
   private applyExpandResize(
     newColumnWidth: number,
@@ -420,25 +415,21 @@ export class TableResizeService {
     tableElement: HTMLElement
   ): ColumnResizeEvent | null {
     const minWidth = this.config.minColumnWidth;
-
-    // Clamp to minimum width (should already be clamped by endResize, but safety first)
     const finalColumnWidth = Math.max(newColumnWidth, minWidth);
     const finalDelta = finalColumnWidth - this.state.startWidth;
 
-    // Update stored width for this column only
-    this.columnWidths[this.state.columnIndex] = finalColumnWidth;
+    this.columnWidthsByColId[this.state.columnId] = finalColumnWidth;
 
-    // Calculate new table width
     const newTableWidth = this.originalTableWidth + finalDelta;
     this.renderer.setStyle(tableElement, 'width', `${newTableWidth}px`);
     this.renderer.setStyle(tableElement, 'min-width', `${newTableWidth}px`);
 
-    // Apply widths directly on DOM elements
-    this.applyWidthsToDOM(tableElement);
+    const container = tableElement.closest(this.config.containerSelector) as HTMLElement;
+    if (container) this.applyWidthsToContainer(container);
 
     return {
-      columnId: this.getColumnId(this.state.columnElement!),
-      columnIndex: this.state.columnIndex,
+      columnId: this.state.columnId,
+      columnIndex: this.orderedColumnIds.indexOf(this.state.columnId),
       width: finalColumnWidth,
       delta: finalDelta
     };
@@ -461,24 +452,27 @@ export class TableResizeService {
   }
 
   /**
-   * Apply column widths directly to DOM elements
-   * More robust than dynamic CSS - doesn't require unique table ID
-   * @param tableElement - The table element
+   * Apply column widths as CSS variables on the container root.
+   * Sets --col-{colId}-w and --col-{colId}-left (cumulative, for sticky columns).
+   * Header and body cells consume width: var(--col-{colId}-w).
    */
-  private applyWidthsToDOM(tableElement: HTMLElement): void {
-    // Apply to header cells (th)
-    const headerRow = DomHandler.findSingle(tableElement, 'thead tr');
-    if (headerRow) {
-      const headers = DomHandler.find(headerRow, 'th');
-      headers.forEach((th, index) => {
-        if (this.columnWidths[index] !== undefined) {
-          const width = `${this.columnWidths[index]}px`;
-          this.renderer.setStyle(th, 'width', width);
-          this.renderer.setStyle(th, 'min-width', width);
-          this.renderer.setStyle(th, 'max-width', width);
-        }
-      });
-    }
+  private applyWidthsToContainer(containerEl: HTMLElement): void {
+    const ids = this.orderedColumnIds.length ? this.orderedColumnIds : Object.keys(this.columnWidthsByColId);
+    let cumulativeLeft = 0;
+    ids.forEach((colId) => {
+      const w = this.columnWidthsByColId[colId];
+      if (w != null) {
+        const safeId = this.cssSafeColId(colId);
+        this.renderer.setStyle(containerEl, `--col-${safeId}-w`, `${w}px`);
+        this.renderer.setStyle(containerEl, `--col-${safeId}-left`, `${cumulativeLeft}px`);
+        cumulativeLeft += w;
+      }
+    });
+  }
+
+  /** Normalize colId for use in CSS custom property names (no spaces/special chars) */
+  private cssSafeColId(colId: string): string {
+    return colId.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '_');
   }
 
   /**
@@ -502,57 +496,77 @@ export class TableResizeService {
     this.cachedHelper = null;
     this.lastMoveEvent = null;
 
-    // Reset state
     this.state = {
       active: false,
       columnElement: null,
-      columnIndex: -1,
+      columnId: '',
+      nextColumnId: null,
       startX: 0,
       startWidth: 0,
       nextColumnStartWidth: 0,
-      initialWidths: [],
+      initialWidths: {},
+      orderedColumnIds: [],
       lastHelperX: 0
     };
   }
 
   /**
-   * Get all current column widths
+   * Get all current column widths by colId
+   */
+  getColumnWidthsByColId(): Record<string, number> {
+    return { ...this.columnWidthsByColId };
+  }
+
+  /**
+   * Get widths in display order (for backward compat when order is known)
    */
   getColumnWidths(): number[] {
-    return [...this.columnWidths];
+    return this.orderedColumnIds.map(id => this.columnWidthsByColId[id] ?? 0);
   }
 
   /**
-   * Set column widths (e.g., from localStorage)
-   * @param widths - Array of column widths
-   * @param tableElement - The table element to apply widths to
+   * Set column widths by colId and apply CSS vars to container
+   */
+  setColumnWidthsByColId(widths: Record<string, number>, orderedColIds: string[], containerEl: HTMLElement): void {
+    this.columnWidthsByColId = { ...widths };
+    this.orderedColumnIds = [...orderedColIds];
+    this.applyWidthsToContainer(containerEl);
+  }
+
+  /**
+   * Set column widths (e.g., from localStorage) - array in display order; colIds must match orderedColumnIds
    */
   setColumnWidths(widths: number[], tableElement: HTMLElement): void {
-    this.columnWidths = [...widths];
-    this.applyWidthsToDOM(tableElement);
+    const container = tableElement.closest(this.config.containerSelector) as HTMLElement;
+    if (!container || !this.orderedColumnIds.length) return;
+    this.orderedColumnIds.forEach((id, i) => {
+      if (widths[i] != null) this.columnWidthsByColId[id] = widths[i];
+    });
+    this.applyWidthsToContainer(container);
   }
 
-  /**
-   * Get the width of a specific column
-   * @param index - Column index
-   */
   getColumnWidth(index: number): number {
-    return this.columnWidths[index] ?? 0;
+    const id = this.orderedColumnIds[index];
+    return id ? (this.columnWidthsByColId[id] ?? 0) : 0;
   }
 
-  /**
-   * Reset all column widths and state
-   */
+  getColumnWidthByColId(colId: string): number {
+    return this.columnWidthsByColId[colId] ?? 0;
+  }
+
   reset(): void {
-    this.columnWidths = [];
+    this.columnWidthsByColId = {};
+    this.orderedColumnIds = [];
     this.state = {
       active: false,
       columnElement: null,
-      columnIndex: -1,
+      columnId: '',
+      nextColumnId: null,
       startX: 0,
       startWidth: 0,
       nextColumnStartWidth: 0,
-      initialWidths: [],
+      initialWidths: {},
+      orderedColumnIds: [],
       lastHelperX: 0
     };
   }

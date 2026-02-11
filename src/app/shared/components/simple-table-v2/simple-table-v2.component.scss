@@ -90,7 +90,167 @@ $resize-helper-color: #2196f3;
   overflow-y: auto;   // Scroll vertical INTERNE (pas la page)
   overflow-x: auto;   // Scroll horizontal si expand mode
   position: relative;
+}
 
+// ========== Virtual scroll grid (équivalent visuel de mat-table th/td/tr) ==========
+.table-wrapper--virtual {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.grid-table {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Grid container: direct children = grid items, one per column (cf. CSS Grid Layout) */
+.grid-header-row {
+  display: grid !important;
+  flex-shrink: 0;
+  height: 48px;
+  align-items: center;
+  background: #f5f5f5;
+  color: rgba(0, 0, 0, 0.87);
+  font-weight: 500;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  user-select: none;
+  width: 100%;
+  min-width: 0;
+}
+
+.grid-header-cell {
+  min-width: 0; // crucial: allow cell to shrink and avoid overlap
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 16px;
+  position: relative;
+
+  .header-label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &.grid-header-cell--select,
+  &.grid-header-cell--config {
+    min-width: 48px;
+    max-width: 48px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.grid-viewport {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+
+  /* CDK viewport content wrapper: ensure width so grid rows can lay out in columns */
+  ::ng-deep .cdk-virtual-scroll-content-wrapper {
+    min-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+.grid-row {
+  display: grid !important;
+  height: 48px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  transition: background-color 0.2s;
+
+  &.clickable {
+    cursor: pointer;
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  &.selected {
+    background-color: rgba(33, 150, 243, 0.1);
+  }
+}
+
+.grid-cell {
+  min-width: 0; // crucial: allow cell to shrink and avoid overlap
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 16px;
+  box-sizing: border-box;
+
+  &.grid-cell--select,
+  &.grid-cell--config {
+    min-width: 48px;
+    max-width: 48px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.cell-content-wrapper {
+  .cell-content,
+  .cell-link {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--clamp-value);
+    line-clamp: var(--clamp-value);
+    overflow: hidden;
+  }
+}
+
+// Sticky columns en mode grid (même rendu que mat-table)
+.grid-header-cell.sticky-column,
+.grid-cell.sticky-column {
+  position: sticky;
+  z-index: 1;
+  background: inherit;
+}
+.grid-header-cell.sticky-column {
+  z-index: 10;
+  background: #f5f5f5;
+}
+.grid-cell.sticky-column {
+  background: white;
+}
+.grid-row:hover .grid-cell.sticky-column {
+  background: rgba(0, 0, 0, 0.04);
+}
+.grid-row.selected .grid-cell.sticky-column {
+  background: rgba(33, 150, 243, 0.1);
+}
+
+.grid-header-cell.sticky-column-end,
+.grid-cell.sticky-column-end {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: inherit;
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+}
+.grid-header-cell.sticky-column-end {
+  z-index: 10;
+  background: #f5f5f5;
+}
+.grid-cell.sticky-column-end {
+  background: white;
 }
 
 table.simple-table-v2 {

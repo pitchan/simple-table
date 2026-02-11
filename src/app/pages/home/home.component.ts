@@ -97,6 +97,7 @@ export class HomeComponent implements OnInit {
       pagination: true,
       selection: true,
       resize: true,
+      virtualScroll: true, 
     },
     defaultPageSize: 100,
     pageSizeOptions: [25, 50, 100],

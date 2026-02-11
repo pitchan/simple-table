@@ -1,9 +1,8 @@
-import { TestBed } from '@angular/core/testing';
 import { DestroyRef, ChangeDetectorRef } from '@angular/core';
 import { ArrayTableStrategy } from './array-table.strategy';
 import { MatSort } from '@angular/material/sort';
 import { MatPaginator } from '@angular/material/paginator';
-import { of } from 'rxjs';
+import { Subject } from 'rxjs';
 
 describe('ArrayTableStrategy', () => {
   let strategy: ArrayTableStrategy<any>;
@@ -11,7 +10,7 @@ describe('ArrayTableStrategy', () => {
   let mockCdr: jasmine.SpyObj<ChangeDetectorRef>;
 
   beforeEach(() => {
-    mockDestroyRef = jasmine.createSpyObj('DestroyRef', ['onDestroy']);
+    mockDestroyRef = { onDestroy: new Subject<void>() } as unknown as DestroyRef;
     mockCdr = jasmine.createSpyObj('ChangeDetectorRef', ['markForCheck']);
 
     strategy = new ArrayTableStrategy(mockDestroyRef, mockCdr);
@@ -29,10 +28,10 @@ describe('ArrayTableStrategy', () => {
 
     strategy.initialize(testData);
 
-    // Verify signals are synchronized immediately (no need for connect())
+    // Pipeline: filteredSortedSig has 2 items, displayRows = slice(0, 50) = 2 items
     expect(strategy.totalCount()).toBe(2);
-    expect(strategy.data()).toEqual(testData);
     expect(strategy.data().length).toBe(2);
+    expect(strategy.data()).toEqual(testData);
   });
 
   it('should call markForCheck when initializing data', () => {
@@ -121,18 +120,29 @@ describe('ArrayTableStrategy', () => {
     expect(result).toBeGreaterThan(0);
   });
 
-  it('should attach paginator and sort', () => {
-    const testData = [{ id: 1 }];
+  it('should attach paginator and sort (signals-driven, no MatTableDataSource)', () => {
+    const testData = [{ id: 1 }, { id: 2 }, { id: 3 }];
     strategy.initialize(testData);
 
-    const mockSort = {} as MatSort;
-    const mockPaginator = {} as MatPaginator;
+    const sortChange$ = new Subject<{ active: string; direction: 'asc' | 'desc' }>();
+    const mockSort = { sortChange: sortChange$.asObservable(), sort: null } as unknown as MatSort;
+
+    const page$ = new Subject<{ pageIndex: number; pageSize: number }>();
+    const mockPaginator = {
+      page: page$.asObservable(),
+      pageIndex: 0,
+      pageSize: 50,
+    } as unknown as MatPaginator;
 
     strategy.attachSort(mockSort);
-    expect(strategy['dataSource'].sort).toBe(mockSort);
-
     strategy.attachPaginator(mockPaginator);
-    expect(strategy['dataSource'].paginator).toBe(mockPaginator);
+
+    expect(strategy.data().length).toBe(3);
+    expect(strategy.totalCount()).toBe(3);
+
+    strategy.setPage(0, 2);
+    expect(strategy.data().length).toBe(2);
+    expect(strategy.totalCount()).toBe(3);
   });
 
   it('should refresh data', () => {
