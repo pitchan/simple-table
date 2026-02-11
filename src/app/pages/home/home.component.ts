@@ -30,6 +30,8 @@ export interface Employee {
   hireDate: Date;
   status: 'active' | 'inactive' | 'on_leave';
   performance: number;
+  /** Télétravail : true/false (icônes) ou texte (ex. "Partiel", "Hybride") pour le 3e cas */
+  remote: boolean | string;
 }
 
 @Component({
@@ -172,6 +174,13 @@ export class HomeComponent implements OnInit {
         tooltip: true,
       },
       {
+        id: 'remote',
+        header: 'Télétravail',
+        type: 'icon',
+        sortable: true,
+        accessor: (row) => row.remote,
+      },
+      {
         id: 'department',
         header: 'Département',
         type: 'badge',
@@ -285,6 +294,17 @@ export class HomeComponent implements OnInit {
       'active', 'inactive', 'on_leave',
     ];
 
+    /** Valeurs pour la colonne icon : true/false (icônes) ou texte (3e cas) */
+    const remoteOptions: (boolean | string)[] = [
+      true,
+      true,
+      false,
+      false,
+      'Partiel',
+      'Hybride',
+      'Sur site',
+    ];
+
     return Array.from({ length: count }, (_, i) => ({
       id: i + 1,
       firstName: firstNames[Math.floor(Math.random() * firstNames.length)],
@@ -298,6 +318,7 @@ export class HomeComponent implements OnInit {
       ),
       status: statuses[Math.floor(Math.random() * statuses.length)],
       performance: 40 + Math.floor(Math.random() * 61),
+      remote: remoteOptions[Math.floor(Math.random() * remoteOptions.length)],
     }));
   }
 }

@@ -13,7 +13,7 @@ export interface TableColumnDef<T = any> {
   i18n?: string;
 
   /** Column type determines rendering strategy */
-  type?: 'text' | 'date' | 'number' | 'badge' | 'link' | 'button' | 'editable' | 'selector' | 'custom';
+  type?: 'text' | 'date' | 'number' | 'badge' | 'link' | 'button' | 'editable' | 'selector' | 'custom' | 'icon';
 
   /** Accessor function to extract value from row (for display/sort/filter) */
   accessor?: (row: T) => any;
@@ -223,6 +223,7 @@ export const DEFAULT_COLUMN_WIDTHS: Record<string, { min: number; max: number; i
   badge: { min: 100, max: 200, initial: 120 },
   link: { min: 100, max: 420, initial: 150 },
   button: { min: 60, max: 120, initial: 80 },
+  icon: { min: 48, max: 80, initial: 48 },
   selector: { min: 48, max: 48, initial: 48 },
   editable: { min: 120, max: 200, initial: 200 },
   custom: { min: 100, max: 400, initial: 150 },

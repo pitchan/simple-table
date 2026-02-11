@@ -115,6 +115,15 @@
             </a>
           </ng-container>
 
+          <!-- Icon Cell -->
+          <ng-container *ngIf="column.type === 'icon'">
+            <mat-icon *ngIf="getCellValue(row, column) === true">check</mat-icon>
+            <mat-icon *ngIf="getCellValue(row, column) === false">close</mat-icon>
+            <span *ngIf="getCellValue(row, column) !== true && getCellValue(row, column) !== false" class="cell-content">
+              {{ getCellValue(row, column) }}
+            </span>
+          </ng-container>
+
           <!-- Button Cell -->
           <ng-container *ngIf="column.type === 'button' && column.actions">
             <button 
