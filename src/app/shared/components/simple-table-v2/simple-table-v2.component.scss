@@ -198,8 +198,8 @@ td.mat-mdc-cell {
   .clamp {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: var(--clamp-value);
+    line-clamp: var(--clamp-value);
     overflow: hidden;
   }
   

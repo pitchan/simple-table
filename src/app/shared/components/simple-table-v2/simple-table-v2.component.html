@@ -94,7 +94,11 @@
           
           <!-- Text/Default Cell -->
           <ng-container *ngIf="!column.type || column.type === 'text' || column.type === 'date' || column.type === 'number' || column.type === 'badge'">
-            <span class="cell-content clamp" [class.badge]="column.type === 'badge'">
+            <span 
+              class="cell-content" 
+              [class.clamp]="column.clamp != null" 
+              [style.--clamp-value]="column.clamp"
+              [class.badge]="column.type === 'badge'">
               {{ getCellValue(row, column) }}
             </span>
           </ng-container>
@@ -104,6 +108,8 @@
             <a 
               href="javascript:void(0)" 
               class="cell-link"
+              [class.clamp]="column.clamp != null"
+              [style.--clamp-value]="column.clamp"
               (click)="onHyperlinkClick($event, row, column.id)">
               {{ getCellValue(row, column) }}
             </a>

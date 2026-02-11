@@ -161,6 +161,7 @@ export class HomeComponent implements OnInit {
         type: 'text',
         sortable: true,
         accessor: (row) => row.firstName,
+        clamp: 1,
       },
       {
         id: 'email',
@@ -183,6 +184,7 @@ export class HomeComponent implements OnInit {
         type: 'text',
         sortable: true,
         accessor: (row) => row.jobTitle,
+        clamp: 2,
       },
       {
         id: 'salary',

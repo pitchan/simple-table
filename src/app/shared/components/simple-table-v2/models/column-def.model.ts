@@ -73,6 +73,9 @@ export interface TableColumnDef<T = any> {
   /** Show tooltip on overflow */
   tooltip?: boolean;
 
+  /** Max number of lines to display in cell (line-clamp). When null/undefined, clamp is disabled. */
+  clamp?: number | null;
+
   /** Column group identifier */
   group?: string;
 
