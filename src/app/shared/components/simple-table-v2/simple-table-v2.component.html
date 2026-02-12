@@ -20,170 +20,26 @@
   <!-- Resize Helper Indicator (PrimeNG-style vertical line during resize) -->
   <div #resizeHelper class="p-datatable-column-resize-helper" style="display: none;"></div>
 
+  <!-- Hidden MatSort for strategies (attachSort / sort.sortChange) when using grid header click -->
+  <div class="grid-sort-anchor" matSort>
+    <button type="button" mat-sort-header="dummy" style="display: none;"></button>
+  </div>
+
   <!-- Loading Overlay -->
   <div class="loading-overlay" *ngIf="loading()">
     <mat-spinner diameter="50"></mat-spinner>
   </div>
 
-  <!-- Table (mat-table) when virtualScroll is off -->
-  <div class="table-wrapper" [class.sticky-header]="config.stickyHeader" *ngIf="!config.features?.virtualScroll">
-    <table 
-      #tableElement
-      mat-table 
-      [dataSource]="tableData()" 
-      matSort
-      [matSortDisabled]="config.features?.sort === false"
-      (matSortChange)="onSortChangeEvent($event)"
-      class="simple-table-v2"
-      [class.responsive]="config.responsive"
-      [class.p-datatable-resizing]="isResizing">
-
-      <!-- Selection Column -->
-      <ng-container matColumnDef="select" *ngIf="selection && config.features?.selection !== false">
-        <th mat-header-cell *matHeaderCellDef [class.sticky-column]="true" class="select-column">
-          <mat-checkbox
-            *ngIf="isMultipleSelection"
-            (change)="$event ? masterToggle() : null"
-            [checked]="selection.hasValue() && isAllSelected()"
-            [indeterminate]="selection.hasValue() && !isAllSelected()">
-          </mat-checkbox>
-        </th>
-        <td mat-cell *matCellDef="let row" [class.sticky-column]="true" class="select-column">
-          <mat-checkbox
-            (click)="$event.stopPropagation()"
-            (change)="$event ? toggleSelection(row) : null"
-            [checked]="selection.isSelected(row)">
-          </mat-checkbox>
-        </td>
-      </ng-container>
-
-      <!-- Dynamic Columns -->
-      <ng-container 
-        *ngFor="let column of visibleColumns; trackBy: trackByColumnId" 
-        [matColumnDef]="column.id">
-        
-        <!-- Header Cell (PrimeNG-style with resizable directive) -->
-        <th 
-          mat-header-cell 
-          *matHeaderCellDef 
-          [style.width]="getColWidthStyle(column.id)"
-          [style.min-width]="getColWidthStyle(column.id)"
-          [style.left]="(column.sticky === true || column.sticky === 'start') ? getColLeftStyle(column.id) : null"
-          [mat-sort-header]="column.id"
-          [disabled]="column.sortable === false || isResizing"
-          [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
-          [class.sticky-column-end]="column.sticky === 'end'"
-          [class.p-resizable-column]="resizableColumnsEnabled && column.resizable !== false"
-          [attr.data-column]="column.id"
-          pResizableColumn
-          [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false"
-          (resizeBegin)="onColumnResizeBegin($event)"
-          (resizeEnd)="onColumnResizeEnd($event)">
-          
-          <span class="header-label">
-            {{ getColumnHeader(column) }}
-          </span>
-        </th>
-
-        <!-- Body Cell -->
-        <td 
-          mat-cell 
-          *matCellDef="let row" 
-          [style.width]="getColWidthStyle(column.id)"
-          [style.min-width]="getColWidthStyle(column.id)"
-          [style.left]="(column.sticky === true || column.sticky === 'start') ? getColLeftStyle(column.id) : null"
-          [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
-          [class.sticky-column-end]="column.sticky === 'end'"
-          [attr.data-column]="column.id"
-          [matTooltip]="column.tooltip ? getCellValue(row, column) : ''"
-          [matTooltipDisabled]="!column.tooltip">
-          
-          <!-- Text/Default Cell -->
-          <ng-container *ngIf="!column.type || column.type === 'text' || column.type === 'date' || column.type === 'number' || column.type === 'badge'">
-            <span 
-              class="cell-content" 
-              [class.clamp]="column.clamp != null" 
-              [style.--clamp-value]="column.clamp"
-              [class.badge]="column.type === 'badge'">
-              {{ getCellValue(row, column) }}
-            </span>
-          </ng-container>
-
-          <!-- Link Cell -->
-          <ng-container *ngIf="column.type === 'link'">
-            <a 
-              href="javascript:void(0)" 
-              class="cell-link"
-              [class.clamp]="column.clamp != null"
-              [style.--clamp-value]="column.clamp"
-              (click)="onHyperlinkClick($event, row, column.id)">
-              {{ getCellValue(row, column) }}
-            </a>
-          </ng-container>
-
-          <!-- Icon Cell -->
-          <ng-container *ngIf="column.type === 'icon'">
-            <mat-icon *ngIf="getCellValue(row, column) === true">check</mat-icon>
-            <mat-icon *ngIf="getCellValue(row, column) === false">close</mat-icon>
-            <span *ngIf="getCellValue(row, column) !== true && getCellValue(row, column) !== false" class="cell-content">
-              {{ getCellValue(row, column) }}
-            </span>
-          </ng-container>
-
-          <!-- Button Cell -->
-          <ng-container *ngIf="column.type === 'button' && column.actions">
-            <button 
-              *ngFor="let action of column.actions"
-              mat-icon-button 
-              [matTooltip]="action.label || ''"
-              (click)="onHyperlinkClick($event, row, action.handlerId)">
-              <mat-icon *ngIf="action.icon">{{ action.icon }}</mat-icon>
-              <span *ngIf="!action.icon">{{ action.label }}</span>
-            </button>
-          </ng-container>
-
-        </td>
-      </ng-container>
-
-      <!-- Config Button Column -->
-      <ng-container matColumnDef="configButton">
-        <th 
-          mat-header-cell 
-          *matHeaderCellDef 
-          class="config-column"
-          [class.sticky-column-end]="true">
-          <button 
-            mat-icon-button 
-            [matMenuTriggerFor]="configMenu"
-            matTooltip="{{ 'COMMON.CONFIGURE_COLUMNS' | translate }}">
-            <mat-icon>more_vert</mat-icon>
-          </button>
-        </th>
-        <td 
-          mat-cell 
-          *matCellDef="let row" 
-          class="config-column"
-          [class.sticky-column-end]="true">
-        </td>
-      </ng-container>
-
-      <!-- Header Row -->
-      <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: config.stickyHeader"></tr>
-
-      <!-- Body Row -->
-      <tr 
-        mat-row 
-        *matRowDef="let row; columns: displayedColumns; let i = index"
-        (click)="onRowClick(row)"
-        [class.clickable]="rowClick.observed"
-        class="table-row"></tr>
-    </table>
-  </div>
-
-  <!-- Virtual scroll grid (when config.features.virtualScroll is true) -->
-  <div class="table-wrapper table-wrapper--virtual" [class.sticky-header]="config.stickyHeader" *ngIf="config.features?.virtualScroll">
-    <div #gridTableElement class="grid-table" [class.p-datatable-resizing]="isResizing" role="grid" [attr.aria-label]="config.id || 'Table'">
-      <!-- Header row -->
+  <!-- Single grid (div-based): one wrapper, one header, body with ngIf on virtual scroll only -->
+  <div class="table-wrapper" 
+       [class.table-wrapper--virtual]="config.features?.virtualScroll" 
+       [class.sticky-header]="config.stickyHeader">
+    <div #gridTableElement 
+         class="grid-table" 
+         [class.p-datatable-resizing]="isResizing" 
+         role="grid" 
+         [attr.aria-label]="config.id || 'Table'">
+      <!-- Header row (unique) -->
       <div class="grid-header-row" 
            [style.display]="'grid'"
            [style.grid-template-columns]="gridTemplateColumns()">
@@ -208,61 +64,85 @@
              [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false"
              (resizeBegin)="onColumnResizeBegin($event)"
              (resizeEnd)="onColumnResizeEnd($event)"
-             (click)="column.sortable !== false && !isResizing ? onVirtualSortHeaderClick(column.id) : null">
+             (click)="config.features?.sort !== false && column.sortable !== false && !isResizing ? onVirtualSortHeaderClick(column.id) : null">
           <span class="header-label">{{ getColumnHeader(column) }}</span>
         </div>
         <ng-container *ngIf="showConfigEditor">
-          <div class="grid-header-cell grid-header-cell--config" role="columnheader"></div>
+          <div class="grid-header-cell grid-header-cell--config" role="columnheader">
+            <button 
+              mat-icon-button 
+              [matMenuTriggerFor]="configMenu"
+              matTooltip="{{ 'COMMON.CONFIGURE_COLUMNS' | translate }}">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+          </div>
         </ng-container>
       </div>
-      <!-- Body: virtual viewport -->
-      <cdk-virtual-scroll-viewport [itemSize]="virtualScrollItemSize" class="grid-viewport">
+
+      <!-- Body: virtual scroll -->
+      <cdk-virtual-scroll-viewport 
+        *ngIf="config.features?.virtualScroll" 
+        [itemSize]="virtualScrollItemSize" 
+        class="grid-viewport">
         <div *cdkVirtualFor="let row of tableData(); trackBy: trackByRow"
-             class="grid-row table-row"
-             [class.clickable]="rowClick.observed"
-             (click)="onRowClick(row)"
-             [style.display]="'grid'"
-             [style.grid-template-columns]="gridTemplateColumns()"
-             role="row">
-          <ng-container *ngIf="selection && config.features?.selection !== false">
-            <div class="grid-cell grid-cell--select" role="gridcell">
-              <mat-checkbox
-                (click)="$event.stopPropagation()"
-                (change)="$event ? toggleSelection(row) : null"
-                [checked]="selection.isSelected(row)">
-              </mat-checkbox>
-            </div>
-          </ng-container>
-          <div *ngFor="let column of visibleColumns; trackBy: trackByColumnId"
-               class="grid-cell cell-content-wrapper"
-               role="gridcell"
-               [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
-               [style.left]="(column.sticky === true || column.sticky === 'start') ? getColLeftStyle(column.id) : null"
-               [matTooltip]="column.tooltip ? getCellValue(row, column) : ''"
-               [matTooltipDisabled]="!column.tooltip">
-            <ng-container *ngIf="!column.type || column.type === 'text' || column.type === 'date' || column.type === 'number' || column.type === 'badge'">
-              <span class="cell-content" [class.clamp]="column.clamp != null" [style.--clamp-value]="column.clamp" [class.badge]="column.type === 'badge'">{{ getCellValue(row, column) }}</span>
-            </ng-container>
-            <ng-container *ngIf="column.type === 'link'">
-              <a href="javascript:void(0)" class="cell-link" [class.clamp]="column.clamp != null" [style.--clamp-value]="column.clamp" (click)="onHyperlinkClick($event, row, column.id)">{{ getCellValue(row, column) }}</a>
-            </ng-container>
-            <ng-container *ngIf="column.type === 'icon'">
-              <mat-icon *ngIf="getCellValue(row, column) === true">check</mat-icon>
-              <mat-icon *ngIf="getCellValue(row, column) === false">close</mat-icon>
-              <span *ngIf="getCellValue(row, column) !== true && getCellValue(row, column) !== false" class="cell-content">{{ getCellValue(row, column) }}</span>
-            </ng-container>
-            <ng-container *ngIf="column.type === 'button' && column.actions">
-              <button *ngFor="let action of column.actions" mat-icon-button [matTooltip]="action.label || ''" (click)="onHyperlinkClick($event, row, action.handlerId)">
-                <mat-icon *ngIf="action.icon">{{ action.icon }}</mat-icon>
-                <span *ngIf="!action.icon">{{ action.label }}</span>
-              </button>
-            </ng-container>
-          </div>
-          <ng-container *ngIf="showConfigEditor">
-            <div class="grid-cell grid-cell--config" role="gridcell"></div>
-          </ng-container>
-        </div>
+             [ngTemplateOutlet]="rowTpl"
+             [ngTemplateOutletContext]="{$implicit: row}"></div>
       </cdk-virtual-scroll-viewport>
+
+      <!-- Body: sans virtual scroll (liste simple) -->
+      <div *ngIf="!config.features?.virtualScroll" class="grid-body">
+        <ng-container *ngFor="let row of tableData(); trackBy: trackByRow"
+                     [ngTemplateOutlet]="rowTpl"
+                     [ngTemplateOutletContext]="{$implicit: row}"></ng-container>
+      </div>
+
+      <!-- Template de ligne partagé (une seule définition des cellules) -->
+      <ng-template #rowTpl let-row>
+    <div class="grid-row table-row"
+         [class.clickable]="rowClick.observed"
+         (click)="onRowClick(row)"
+         [style.display]="'grid'"
+         [style.grid-template-columns]="gridTemplateColumns()"
+         role="row">
+      <ng-container *ngIf="selection && config.features?.selection !== false">
+        <div class="grid-cell grid-cell--select" role="gridcell">
+          <mat-checkbox
+            (click)="$event.stopPropagation()"
+            (change)="$event ? toggleSelection(row) : null"
+            [checked]="selection.isSelected(row)">
+          </mat-checkbox>
+        </div>
+      </ng-container>
+      <div *ngFor="let column of visibleColumns; trackBy: trackByColumnId"
+           class="grid-cell cell-content-wrapper"
+           role="gridcell"
+           [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
+           [style.left]="(column.sticky === true || column.sticky === 'start') ? getColLeftStyle(column.id) : null"
+           [matTooltip]="column.tooltip ? getCellValue(row, column) : ''"
+           [matTooltipDisabled]="!column.tooltip">
+        <ng-container *ngIf="!column.type || column.type === 'text' || column.type === 'date' || column.type === 'number' || column.type === 'badge'">
+          <span class="cell-content" [class.clamp]="column.clamp != null" [style.--clamp-value]="column.clamp" [class.badge]="column.type === 'badge'">{{ getCellValue(row, column) }}</span>
+        </ng-container>
+        <ng-container *ngIf="column.type === 'link'">
+          <a href="javascript:void(0)" class="cell-link" [class.clamp]="column.clamp != null" [style.--clamp-value]="column.clamp" (click)="onHyperlinkClick($event, row, column.id)">{{ getCellValue(row, column) }}</a>
+        </ng-container>
+        <ng-container *ngIf="column.type === 'icon'">
+          <mat-icon *ngIf="getCellValue(row, column) === true">check</mat-icon>
+          <mat-icon *ngIf="getCellValue(row, column) === false">close</mat-icon>
+          <span *ngIf="getCellValue(row, column) !== true && getCellValue(row, column) !== false" class="cell-content">{{ getCellValue(row, column) }}</span>
+        </ng-container>
+        <ng-container *ngIf="column.type === 'button' && column.actions">
+          <button *ngFor="let action of column.actions" mat-icon-button [matTooltip]="action.label || ''" (click)="onHyperlinkClick($event, row, action.handlerId)">
+            <mat-icon *ngIf="action.icon">{{ action.icon }}</mat-icon>
+            <span *ngIf="!action.icon">{{ action.label }}</span>
+          </button>
+        </ng-container>
+      </div>
+      <ng-container *ngIf="showConfigEditor">
+        <div class="grid-cell grid-cell--config" role="gridcell"></div>
+      </ng-container>
+    </div>
+      </ng-template>
     </div>
   </div>
 

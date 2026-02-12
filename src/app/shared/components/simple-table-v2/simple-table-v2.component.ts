@@ -24,7 +24,6 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { Observable } from 'rxjs';
-import { MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -82,7 +81,6 @@ import { DomHandler } from './helpers/dom-handler';
   standalone: true,
   imports: [
     CommonModule,
-    MatTableModule,
     MatSortModule,
     MatPaginatorModule,
     MatCheckboxModule,
@@ -179,7 +177,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   @ViewChild(MatSort) sort!: MatSort;
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild('resizeHelper') resizeHelper!: ElementRef<HTMLDivElement>;
-  @ViewChild('tableElement', { read: ElementRef }) tableElementRef!: ElementRef<HTMLTableElement>;
   @ViewChild('gridTableElement', { read: ElementRef }) gridTableElementRef!: ElementRef<HTMLElement>;
 
   // ========== STRATEGY (internal) ==========
@@ -569,13 +566,17 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     return 48;
   }
 
-  /** Sort header click when using virtual scroll grid (no MatSort in DOM). */
+  /** Sort header click (grille unifiée : on met à jour la strategy et on synce MatSort pour attachSort). */
   onVirtualSortHeaderClick(columnId: string): void {
     if (this.config?.features?.sort === false) return;
     const sort = this.strategy.getSort?.() ?? { active: null, direction: 'asc' as 'asc' | 'desc' };
     const nextDir = sort.active === columnId && sort.direction === 'asc' ? 'desc' : 'asc';
     this.strategy.setSort?.(columnId, nextDir);
     this.sortChange.emit({ active: columnId, direction: nextDir });
+    // Syncer MatSort pour les strategies qui utilisent attachSort (ex. FilterableDataSource)
+    if (this.sort) {
+      this.sort.sort({ id: columnId, start: nextDir, disableClear: true });
+    }
     this.cdr.markForCheck();
   }
 
@@ -737,16 +738,15 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   /**
-   * Get the table element (cached)
+   * Get the grid table element (unique structure div-based)
    */
   private getTableElement(): HTMLElement | null {
-    if (this.config?.features?.virtualScroll && this.gridTableElementRef?.nativeElement) {
-      return this.gridTableElementRef.nativeElement;
-    }
-    if (this.tableElementRef?.nativeElement) {
-      return this.tableElementRef.nativeElement;
-    }
-    return this.tableEl ??= this.elementRef.nativeElement.querySelector('table.simple-table-v2');
+    const gridRef = this.gridTableElementRef?.nativeElement;
+    if (gridRef) return gridRef;
+    if (this.tableEl) return this.tableEl;
+    const el = this.elementRef.nativeElement.querySelector('.grid-table') as HTMLElement | null;
+    if (el) this.tableEl = el;
+    return el;
   }
 
   /**

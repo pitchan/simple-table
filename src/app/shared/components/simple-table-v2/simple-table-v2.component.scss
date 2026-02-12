@@ -16,16 +16,9 @@ $resize-helper-color: #2196f3;
 
   // ========== PrimeNG-style Resize Modes ==========
   
-  // Resizable table base styles
+  // Resizable grid base styles (grille unifiée en div)
   &.p-datatable-resizable {
-    > .table-wrapper > table.simple-table-v2 {
-      table-layout: fixed;
-    }
-  }
-
-  // Fit mode: table width stays constant, adjacent columns affected
-  &.p-datatable-resizable-fit {
-    > .table-wrapper > table.simple-table-v2 {
+    > .table-wrapper > .grid-table {
       width: 100%;
     }
   }
@@ -35,8 +28,7 @@ $resize-helper-color: #2196f3;
     > .table-wrapper {
       overflow-x: auto;
     }
-    
-    > .table-wrapper > table.simple-table-v2 {
+    > .table-wrapper > .grid-table {
       width: auto;
       min-width: 100%;
     }
@@ -82,6 +74,16 @@ $resize-helper-color: #2196f3;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* MatSort caché pour les strategies (attachSort / sort.sortChange) */
+.grid-sort-anchor {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .table-wrapper {
@@ -157,6 +159,14 @@ $resize-helper-color: #2196f3;
     min-width: 100%;
     box-sizing: border-box;
   }
+}
+
+/* Body sans virtual scroll (liste simple, même grille) */
+.grid-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
 }
 
 .grid-row {
@@ -252,120 +262,6 @@ $resize-helper-color: #2196f3;
 .grid-cell.sticky-column-end {
   background: white;
 }
-
-table.simple-table-v2 {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-// Sticky Header & Column Styles
-th.mat-header-cell {
-  background: #f5f5f5;
-  color: rgba(0, 0, 0, 0.87);
-  font-weight: 500;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0 16px;
-  position: relative; // For resize handle
-  user-select: none; // Prevent text selection during resize
-
-  &.resizable-header {
-    &:hover {
-      background: #eeeeee; // Slight highlight to indicate interactable
-    }
-  }
-
-  // Flex alignment for header content
-  .header-label {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-// Config Column Styles
-.config-column {
-  width: 48px; // Standard icon button size + padding
-  min-width: 48px;
-  max-width: 48px;
-  padding: 0 !important;
-  text-align: center;
-  
-  // Ensure the button is centered
-  .mat-icon-button {
-    margin: 0 auto;
-  }
-}
-
-// Sticky Columns
-.sticky-column {
-  position: sticky !important;
-  z-index: 1; // Higher than normal cells, lower than header
-  background: inherit; // Inherit from row/header
-
-  &.mat-header-cell {
-    z-index: 100 !important; // Highest priority for top-left corner
-  }
-}
-
-.sticky-column-end {
-  position: sticky !important;
-  right: 0;
-  z-index: 1;
-  background: inherit;
-  border-left: 1px solid rgba(0,0,0,0.12); // Separator for sticky end column
-  
-  // Ensure header is on top
-  &.mat-header-cell {
-    z-index: 100 !important;
-  }
-}
-
-// Rows
-tr.mat-row, tr.mat-header-row {
-  height: 48px;
-}
-
-tr.table-row {
-  transition: background-color 0.2s;
-
-  // Override Angular Material default row height (52px) for better visual density
-  &.mat-mdc-row {
-    --mat-table-row-item-container-height: 41px;
-  }
-
-  &.clickable {
-    cursor: pointer;
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.04);
-    }
-  }
-
-  &.selected {
-    background-color: rgba(33, 150, 243, 0.1);
-  }
-}
-
-// Cells
-td.mat-mdc-cell {
-
-  &.select-column {
-    width: 48px;
-    padding: 0 8px;
-  }
-  .clamp {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: var(--clamp-value);
-    line-clamp: var(--clamp-value);
-    overflow: hidden;
-  }
-  
-}
-
-
 
 // Components in cells
 .cell-link {
