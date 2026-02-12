@@ -103,7 +103,7 @@ export class HomeComponent implements OnInit {
     pageSizeOptions: [25, 50, 100],
     stickyHeader: true,
     responsive: true,
-    columnResizeMode: 'expand',
+    columnResizeMode: 'fit',
   };
 
   // ────────────────────────────────────────────
@@ -241,17 +241,6 @@ export class HomeComponent implements OnInit {
         sortable: true,
         accessor: (row) => row.performance,
         formatter: (value: number) => `${value} %`,
-      },
-      {
-        id: 'actions',
-        header: 'Actions',
-        type: 'button',
-        sortable: false,
-        sticky: 'end',
-        actions: [
-          { kind: 'button', icon: 'visibility', label: 'Voir', handlerId: 'view' },
-          { kind: 'button', icon: 'edit', label: 'Éditer', handlerId: 'edit' },
-        ],
       },
     ];
   }

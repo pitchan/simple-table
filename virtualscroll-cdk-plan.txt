@@ -1,0 +1,167 @@
+---
+name: Virtual scroll table refacto
+overview: Plan en 3 phases pour sortir de MatTableDataSource (stratégie Array uniquement), introduire un moteur filter/sort en signals avec filtres par colonne et debounce, migrer le resize vers CSS variables à la racine, puis activer le virtual scroll CDK avec une table en grid (Option A) et trackBy stable.
+todos: []
+isProject: false
+---
+
+# Plan d'action : Virtual scroll + moteur données (SimpleTableV2)
+
+Contexte : discussion virtualscroll-cdk + stratégies actuelles [filterable-datasource.strategy.ts](src/app/shared/components/simple-table-v2/strategies/filterable-datasource.strategy.ts) (server-side, inchangée) et [array-table.strategy.ts](src/app/shared/components/simple-table-v2/strategies/array-table.strategy.ts) (client-side, MatTableDataSource). Objectif : permettre virtual scroll + resize robuste sans big bang, en restant aligné avec le modèle existant (TableState.filters, TableColumnDef.filter, config.sortingDataAccessor).
+
+---
+
+## État actuel (aligné avec le code)
+
+- **ArrayTableStrategy** : utilise `MatTableDataSource`, `filterPredicate` (chaîne unique) et `sortingDataAccessor` via [StrategyConfig](src/app/shared/components/simple-table-v2/models/table-strategy.interface.ts). Pas d’état de filtres par colonne dans la stratégie.
+- **FilterableDataSourceStrategy** : reste tel quel (pagination/sort/filter côté serveur via `FilterableDataSource`).
+- **Resize** : [TableResizeService](src/app/shared/components/simple-table-v2/services/table-resize.service.ts) applique les largeurs en direct sur les `th` via `applyWidthsToDOM()` (Renderer2), pas de CSS variables. `table-layout: fixed` est déjà appliqué en mode resizable dans [simple-table-v2.component.scss](src/app/shared/components/simple-table-v2/simple-table-v2.component.scss) (l.21–23).
+- **Modèle** : [TableState](src/app/shared/components/simple-table-v2/models/column-def.model.ts) expose déjà `filters: Record<string, any>` (par colonne) et `TableColumnDef` a `filterable`, `filter: { kind, options }`. La stratégie Array n’utilise pas encore cet état par colonne.
+- **Rows** : pas de `trackBy` sur les lignes dans le template ; [simple-table-v2.component.ts](src/app/shared/components/simple-table-v2/simple-table-v2.component.ts) expose `trackByIndex`. Les exemples utilisent `row.id`.
+
+---
+
+## Phase 1 — Moteur données (sortir MatTableDataSource pour Array uniquement)
+
+**Objectif** : Remplacer `MatTableDataSource` dans `ArrayTableStrategy` par un pipeline signals (rows → filter → sort → displayRows) sans changer le template (toujours `mat-table` + `[dataSource]="tableData()"`). Prérequis : **filtres par colonne** dès cette phase.
+
+### 1.1 Modèle d’état des filtres (prérequis Phase 1)
+
+- Introduire un type **par colonne** (pas un filtre global unique) :
+  - `ColumnFilterState` (ex. `{ value: any; kind?: 'text'|'select'|'dateRange'|'numberRange' }`) ou réutiliser/étendre la forme déjà utilisée dans les écrans (si existante).
+  - `filtersSig = signal<Record<string, ColumnFilterState>>({})` avec clé = `colId` (identifiant de colonne stable).
+- Dans la stratégie (ou un service dédié), `applyFilters(rows, filtersSig())` : pour chaque colonne ayant un filtre actif, appliquer le prédicat correspondant (réutiliser les logiques custom existantes). Combinaison ET entre colonnes (ou OR si déjà en place ailleurs, à aligner).
+
+Référence : [column-def.model.ts](src/app/shared/components/simple-table-v2/models/column-def.model.ts) (TableState.filters, TableColumnDef.filter).
+
+### 1.2 Moteur dans ArrayTableStrategy
+
+- **État** :
+  - `rowsSig = signal<T[]>([])` (données brutes de la page).
+  - `filtersSig = signal<Record<string, ColumnFilterState>>({})` (voir 1.1).
+  - `sortSig = signal<{ active: string | null; direction: 'asc'|'desc' }>({ active: null, direction: 'asc' })`.
+- **Pipeline (tranche claire)** : ne pas compter sur mat-table + paginator pour paginer un tableau brut — sans MatTableDataSource, le paginator ne fait plus le lien. Donc **slice dans la stratégie** :
+  - `filteredSortedSig = computed(() => applySort(applyFilters(rowsSig(), filtersSig()), sortSig()))`
+  - `pageSig = signal<{ index: number; size: number }>({ index: 0, size: 50 })`
+  - `displayRows = computed(() => slice(filteredSortedSig(), pageSig()))` (slice start = index * size, end = start + size)
+  - `totalCount = computed(() => filteredSortedSig().length)` → alimente le paginator en `length`, rendu stable.
+- **Calcul** : réutiliser `sortingDataAccessor` (et comparators custom) du config ; `applyFilters(rows, filtersSig())` par colonne (ET entre colonnes). Pas de slice en dehors de la stratégie.
+- **Debounce** : sur les **events UI**, pas sur le computed. Une subscription unique (ex. `toObservable(rawFiltersSig).pipe(debounceTime(150)).subscribe(v => filtersSig.set(v))`) ou un petit helper dans les handlers ; éviter les `effect()` qui font du `set` en boucle.
+- **Interface** : exposer `setFilters(...)`, `setSort(active, direction)`, `setPage(index, size)`. La stratégie expose `data = computed(() => displayRows())`, `totalCount = computed(() => filteredSortedSig().length)`, `loading`. Le composant garde `[dataSource]="tableData()"` et bind la pagination sur `totalCount()` + `pageSig` (pageIndex / pageSize).
+
+Fichiers impactés : [array-table.strategy.ts](src/app/shared/components/simple-table-v2/strategies/array-table.strategy.ts), [table-strategy.interface.ts](src/app/shared/components/simple-table-v2/models/table-strategy.interface.ts) (optionnel : étendre StrategyConfig pour filtres par colonne). Ne pas toucher à [filterable-datasource.strategy.ts](src/app/shared/components/simple-table-v2/strategies/filterable-datasource.strategy.ts).
+
+### 1.3 MatSort : garder le composant, débrancher la magie
+
+- Ne plus dépendre de MatSort côté datasource (puisque plus de MatTableDataSource). Garder `matSort` dans le template pour l’UI.
+- **attachSort(sort: MatSort)** : s’abonner à `sort.sortChange` → `sortSig.set({ active, direction })`. Optionnel : `sort.initialized` pour appliquer un sort initial (état restauré depuis TableState).
+- Aucune liaison datasource ↔ MatSort ; la stratégie pilote tout via `sortSig`.
+
+### 1.4 Adaptateur filtre global (migration écran par écran)
+
+- Prévoir un adaptateur explicite pour l’ancien filtre global : `config.globalFilterAdapter?: (global: string) => Record<string, ColumnFilterState>` (ou une colonne filtre “virtuelle” si préféré). Permet de migrer écran par écran sans casser les écrans qui passent encore un `filterPredicate` / une chaîne globale.
+
+### 1.5 Points d’attention
+
+- Conserver la compatibilité avec `StrategyConfig` (sortingDataAccessor, debug). Les parents qui utilisaient `filterPredicate` unique peuvent passer par `globalFilterAdapter` jusqu’à migration vers filtres par colonne.
+
+---
+
+## Phase 2 — CSS variables pour les largeurs (résize)
+
+**Objectif** : Une seule source de vérité pour les largeurs, appliquée à la **racine** ; header et body consomment les variables. Resize basé sur **colId** partout (pas d’index). Compatible grid + virtual scroll (Phase 3).
+
+### 2.1 Racine des variables
+
+- Définir les variables sur **un seul ancêtre** : `.simple-table-v2-container` ou `:host` dans [simple-table-v2.component.scss](src/app/shared/components/simple-table-v2/simple-table-v2.component.scss).
+- Format stable : `--col-{colId}-w` avec `colId` normalisé (identifiant de colonne stable, pas d’index). Pour les **colonnes sticky** (grid) : ajouter `--col-{colId}-left` (offset left cumulé) pour que les cellules sticky fassent `position: sticky; left: var(--col-x-left); z-index: ...` et reproduire le comportement sticky de mat-table. (Si pas de colonnes sticky, ignorer `-left`.)
+
+### 2.2 Resize par colId (bannir les index TH)
+
+- **Bannir l’usage des index de TH** : avec reorder de colonnes + grid, l’index devient une source de bugs. [TableResizeService](src/app/shared/components/simple-table-v2/services/table-resize.service.ts) doit basculer sur **colId partout** : handle resize identifié par `colId`, map `colId → width`, vars `--col-{colId}-w`. Plus de `columnWidths[index]` ; utiliser `Map<string, number>` ou `Record<string, number>` par colId.
+
+### 2.3 Application des variables
+
+- Mettre à jour les styles sur le **conteneur racine** (pas sur chaque th/td). Le composant ou le service applique `--col-{colId}-w` (et éventuellement `--col-{colId}-left` pour sticky) sur `.simple-table-v2-container` ou `:host`.
+
+### 2.4 table-layout: fixed
+
+- Conserver `table-layout: fixed` en mode table classique (déjà présent quand resizable est activé). En mode grid (Phase 3), les largeurs viennent de `grid-template-columns`, pas de `width` sur les cellules (voir Phase 3).
+
+---
+
+## Phase 3 — Virtual scroll (Option A : grid, pas de `<table>` virtualisé)
+
+**Objectif** : Réduire le DOM à ~30–80 lignes visibles pour des pages de 1k–5k lignes, avec header sticky et resize qui restent fonctionnels.
+
+### 3.1 Choix explicite : tout en grid
+
+- **Option retenue** : header **et** body en grille CSS (divs), pas de `<table>` pour la zone virtualisée. Rôle ARIA `grid` pour l’accessibilité.
+- Alternative écartée ici : garder un `<table>` et virtualiser des `<tr>` (instable avec sticky + resize).
+
+### 3.2 Structure cible et grid-template-columns
+
+- Conteneur : `cdk-virtual-scroll-viewport` avec hauteur fixe (zone scrollable actuelle `.table-wrapper`).
+- **Grille** : pour un alignement parfait et stable avec virtual scroll, ne pas mettre `width` sur chaque cellule. À la place : calculer une **chaîne** `gridTemplateColumns` à partir de la liste des colonnes visibles (ordre affiché), ex. `"var(--col-a-w) var(--col-b-w) ..."`, et la binder sur la **ligne header** et sur la **ligne body** (ou conteneur des rows) : `[style.gridTemplateColumns]="gridTemplateColumns()"`. Une seule source (colonnes visibles + vars), alignement identique header/body, pas de “cells qui décident leur largeur”.
+- Header : une ligne en grille (divs), sticky ; colonnes sticky utilisent `left: var(--col-{id}-left)` (Phase 2).
+- Body : `*cdkVirtualFor="let row of tableData(); trackBy: trackByRow"` (voir 3.3) avec `itemSize` fixe (ex. 48 px pour V1).
+
+### 3.3 trackBy et hauteur de ligne
+
+- **trackBy** : ne pas utiliser `trackByIndex`. Utiliser une clé stable : `(i, row) => row.id ?? stableKey(row)`. Exposer `trackByRow` dans le composant ; si les lignes n’ont pas toujours `id`, prévoir un accesseur optionnel dans la config (ex. `TableConfig.rowIdAccessor?: (row: T) => string | number`) avec fallback (ex. index ou hash limité aux propriétés affichées). Important pour sélection/édition et réutilisation des nœuds DOM par le CDK.
+- **itemSize** : fixe pour V1 (ex. 48 px, aligné sur [simple-table-v2.component.scss](src/app/shared/components/simple-table-v2/simple-table-v2.component.scss) l.166). Imposer une hauteur de ligne fixe (clamp / ellipsis, pas de multiligne qui ferait varier la hauteur) pour éviter les glitches. Autosize ou hauteur variable = évolution ultérieure.
+
+### 3.4 Intégration technique
+
+- Importer `ScrollingModule` depuis `@angular/cdk/scrolling` (déjà dépendance `@angular/cdk` en 16).
+- Remplacer la zone body actuelle (mat-table body) par la structure viewport + grille ; conserver les mêmes cellules (contenu, types, sticky) en divs avec les bons rôles ARIA.
+- Feature flag ou config (ex. `config.features?.virtualScroll`) pour activer progressivement le mode virtual scroll sans casser les écrans existants.
+
+### 3.5 Resize et sticky
+
+- Les largeurs restent gérées par les CSS vars à la racine (Phase 2) ; `gridTemplateColumns` utilise ces vars, header et lignes virtuelles restent alignés.
+- Sticky : header en `position: sticky` ; colonnes sticky avec `left: var(--col-{id}-left)` (Phase 2).
+
+### 3.6 Selection / édition et recyclage du viewport
+
+- Même avec un trackBy stable, le CDK recycle des nœuds. **Si des inputs ou édition dans les cellules** : piloter l’état via **FormControl / state externe** (pas via le DOM). Éviter autofocus et ngModel non maîtrisés pour limiter les effets de bord au recyclage.
+
+---
+
+## Ordre et risques
+
+
+| Phase | Livrable                                                                                    | Risque                                                             |
+| ----- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1     | ArrayTableStrategy sans MatTableDataSource, filtres par colonne + debounce, tri via signals | Migration des écrans qui utilisaient filterPredicate unique        |
+| 2     | Largeurs en CSS vars sur le conteneur, resize qui met à jour ces vars                       | Régression visuelle si une page n’utilise pas le conteneur attendu |
+| 3     | Table en grid + CDK virtual scroll, trackBy stable, itemSize fixe                           | A11y à valider (rôles grid), refonte template body                 |
+
+
+---
+
+## Résumé des ajustements intégrés
+
+**Phase 1**
+
+- Filtres par colonne : `filtersSig = signal<Record<colId, ColumnFilterState>>({})`, `applyFilters(rows, filtersSig())`.
+- Pagination : slice dans la stratégie — `filteredSortedSig`, `pageSig`, `displayRows = slice(filteredSortedSig(), pageSig())`, `totalCount = filteredSortedSig().length` ; pas de reliance sur mat-table + paginator pour paginer un tableau.
+- MatSort : garder le composant UI, débrancher la magie — `attachSort(sort)` subscribe à `sort.sortChange` → `sortSig.set(...)` ; pas de liaison datasource.
+- Adaptateur filtre global : `config.globalFilterAdapter?: (global: string) => Record<colId, ColumnFilterState>` pour migration écran par écran.
+- Debounce sur les events UI (handlers ou une subscription unique), pas sur le computed ; éviter `effect()` qui fait du `set` en boucle.
+
+**Phase 2**
+
+- CSS vars à la racine (`.simple-table-v2-container` ou `:host`) : `--col-{colId}-w` ; si colonnes sticky : `--col-{colId}-left` (offset cumulé) pour `position: sticky; left: var(...)`.
+- Resize par **colId** partout : bannir les index TH ; map colId → width, vars `--col-{colId}-w`.
+- `table-layout: fixed` conservé en mode table.
+
+**Phase 3**
+
+- Option A : header et body en grid ; pas de virtualisation de `<tr>` dans `<table>`.
+- `grid-template-columns` : chaîne calculée depuis colonnes visibles, `[style.gridTemplateColumns]="gridTemplateColumns()"` sur header row + body row ; pas de `width` sur chaque cellule.
+- trackBy stable : `row.id ?? stableKey(row)` (ou `rowIdAccessor`), pas `trackByIndex`.
+- itemSize fixe en V1 ; hauteur de ligne imposée (clamp/ellipsis).
+- Selection/édition : état piloté par FormControl / state externe ; attention au recyclage du viewport (éviter autofocus / ngModel non maîtrisés).
+
+Ce plan reste aligné avec votre code et avec la discussion virtualscroll-cdk et vos remarques.

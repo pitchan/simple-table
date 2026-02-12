@@ -182,7 +182,7 @@
 
   <!-- Virtual scroll grid (when config.features.virtualScroll is true) -->
   <div class="table-wrapper table-wrapper--virtual" [class.sticky-header]="config.stickyHeader" *ngIf="config.features?.virtualScroll">
-    <div #gridTableElement class="grid-table" role="grid" [attr.aria-label]="config.id || 'Table'">
+    <div #gridTableElement class="grid-table" [class.p-datatable-resizing]="isResizing" role="grid" [attr.aria-label]="config.id || 'Table'">
       <!-- Header row -->
       <div class="grid-header-row" 
            [style.display]="'grid'"
@@ -208,7 +208,7 @@
              [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false"
              (resizeBegin)="onColumnResizeBegin($event)"
              (resizeEnd)="onColumnResizeEnd($event)"
-             (click)="column.sortable !== false ? onVirtualSortHeaderClick(column.id) : null">
+             (click)="column.sortable !== false && !isResizing ? onVirtualSortHeaderClick(column.id) : null">
           <span class="header-label">{{ getColumnHeader(column) }}</span>
         </div>
         <ng-container *ngIf="showConfigEditor">

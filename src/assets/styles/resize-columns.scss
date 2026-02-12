@@ -29,13 +29,19 @@ body.p-unselectable-text {
 
 /* ========== PrimeNG-style Column Resizer (Global Styles) ========== */
 /* These styles target dynamically created elements by ResizableColumnDirective */
+/* Supports both mat-table (th) and virtual scroll grid (.grid-header-cell) */
 
-/* Resizable column header styling */
+/* Resizable column header styling - mat-table */
 th.p-resizable-column {
   position: relative;
 }
 
-/* The resize handle created by the directive */
+/* Resizable column header styling - virtual scroll grid */
+.grid-header-cell.p-resizable-column {
+  position: relative;
+}
+
+/* The resize handle created by the directive - mat-table */
 th.p-resizable-column .p-datatable-column-resizer {
   position: absolute;
   top: 0;
@@ -51,7 +57,23 @@ th.p-resizable-column .p-datatable-column-resizer {
   touch-action: none; /* Important for pointer events */
 }
 
-/* Visual indicator - ALWAYS visible (subtle line) */
+/* The resize handle - virtual scroll grid */
+.grid-header-cell.p-resizable-column .p-datatable-column-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: $resize-handle-width;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  touch-action: none;
+}
+
+/* Visual indicator - ALWAYS visible (subtle line) - mat-table */
 th.p-resizable-column .p-datatable-column-resizer::after {
   content: '';
   position: absolute;
@@ -65,14 +87,35 @@ th.p-resizable-column .p-datatable-column-resizer::after {
   border-radius: 1px;
 }
 
-/* Hover state - more visible */
+/* Visual indicator - virtual scroll grid */
+.grid-header-cell.p-resizable-column .p-datatable-column-resizer::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  right: 50%;
+  width: 2px;
+  background-color: rgba(0, 0, 0, 0.15);
+  transform: translateX(50%);
+  transition: background-color 0.2s ease, width 0.15s ease, box-shadow 0.2s ease;
+  border-radius: 1px;
+}
+
+/* Hover state - more visible - mat-table */
 th.p-resizable-column .p-datatable-column-resizer:hover::after {
   background-color: $resize-helper-color;
   width: 3px;
   box-shadow: 0 0 4px rgba(33, 150, 243, 0.4);
 }
 
-/* Focus visible for keyboard accessibility (WCAG AA) */
+/* Hover state - virtual scroll grid */
+.grid-header-cell.p-resizable-column .p-datatable-column-resizer:hover::after {
+  background-color: $resize-helper-color;
+  width: 3px;
+  box-shadow: 0 0 4px rgba(33, 150, 243, 0.4);
+}
+
+/* Focus visible for keyboard accessibility (WCAG AA) - mat-table */
 th.p-resizable-column .p-datatable-column-resizer:focus-visible {
   outline: none;
 }
@@ -83,8 +126,26 @@ th.p-resizable-column .p-datatable-column-resizer:focus-visible::after {
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
 }
 
-/* Active resizing state on the column */
+/* Focus visible - virtual scroll grid */
+.grid-header-cell.p-resizable-column .p-datatable-column-resizer:focus-visible {
+  outline: none;
+}
+
+.grid-header-cell.p-resizable-column .p-datatable-column-resizer:focus-visible::after {
+  background-color: $resize-helper-color;
+  width: 3px;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
+}
+
+/* Active resizing state on the column - mat-table */
 th.p-resizable-column.p-resizable-column-resizing .p-datatable-column-resizer::after {
+  background-color: $resize-helper-color;
+  width: 3px;
+  box-shadow: 0 0 6px rgba(33, 150, 243, 0.5);
+}
+
+/* Active resizing state - virtual scroll grid */
+.grid-header-cell.p-resizable-column.p-resizable-column-resizing .p-datatable-column-resizer::after {
   background-color: $resize-helper-color;
   width: 3px;
   box-shadow: 0 0 6px rgba(33, 150, 243, 0.5);
@@ -93,6 +154,12 @@ th.p-resizable-column.p-resizable-column-resizing .p-datatable-column-resizer::a
 /* Table state during resize - prevent text selection */
 table.p-datatable-resizing th,
 table.p-datatable-resizing td {
+  user-select: none;
+}
+
+/* Grid state during resize - prevent text selection */
+.grid-table.p-datatable-resizing .grid-header-cell,
+.grid-table.p-datatable-resizing .grid-cell {
   user-select: none;
 }
 
