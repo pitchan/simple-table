@@ -53,15 +53,15 @@
             </mat-checkbox>
           </div>
         </ng-container>
-        <div *ngFor="let column of visibleColumns; trackBy: trackByColumnId"
+        <div *ngFor="let column of visibleColumns; trackBy: trackByColumnId; let colIndex = index"
              class="grid-header-cell"
              role="columnheader"
              [attr.data-column]="column.id"
              [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
              [style.left]="(column.sticky === true || column.sticky === 'start') ? getColLeftStyle(column.id) : null"
-             [class.p-resizable-column]="resizableColumnsEnabled && column.resizable !== false"
+             [class.p-resizable-column]="resizableColumnsEnabled && column.resizable !== false && !(colIndex === visibleColumns.length - 1 && columnResizeMode === 'fit')"
              pResizableColumn
-             [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false"
+             [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false || (colIndex === visibleColumns.length - 1 && columnResizeMode === 'fit')"
              (resizeBegin)="onColumnResizeBegin($event)"
              (resizeEnd)="onColumnResizeEnd($event)"
              (click)="config.features?.sort !== false && column.sortable !== false && !isResizing ? onVirtualSortHeaderClick(column.id) : null">

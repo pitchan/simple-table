@@ -19,7 +19,7 @@ description: 'On css/scss creation or to automatically review and validate all C
 1. **OBLIGATOIRE** : Adopte le rôle de l'agent CSS (`.github/agents/css.agent.md`)
 2. **OBLIGATOIRE** : Consulte la référence détaillée (`.github/docs/css.reference.md`)
 3. Analyse le code SCSS fourni ou à créer
-4. Execute ce script :
+4. Execute ce script a la fin de l'execution pour valider le css par mon script hello.sh:
 ```bash
 bash ./scripts/hello.sh
 ```

@@ -124,6 +124,55 @@ $resize-helper-color: #2196f3;
   min-width: 0;
 }
 
+/* Column width by type: each cell has a class (e.g. col-type-text) that uses the type-based CSS variable.
+   Variables (--col-text-w, --col-date-w, etc.) are set on the container at init and at end of resize only. */
+.col-type-text {
+  width: var(--col-text-w, 200px);
+  min-width: var(--col-text-w, 200px);
+}
+.col-type-date {
+  width: var(--col-date-w, 120px);
+  min-width: var(--col-date-w, 120px);
+}
+.col-type-number {
+  width: var(--col-number-w, 110px);
+  min-width: var(--col-number-w, 110px);
+}
+.col-type-badge {
+  width: var(--col-badge-w, 120px);
+  min-width: var(--col-badge-w, 120px);
+}
+.col-type-link {
+  width: var(--col-link-w, 150px);
+  min-width: var(--col-link-w, 150px);
+}
+.col-type-button {
+  width: var(--col-button-w, 80px);
+  min-width: var(--col-button-w, 80px);
+}
+.col-type-icon {
+  width: var(--col-icon-w, 48px);
+  min-width: var(--col-icon-w, 48px);
+}
+.col-type-selector {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+}
+.col-type-editable {
+  width: var(--col-editable-w, 200px);
+  min-width: var(--col-editable-w, 200px);
+}
+.col-type-custom {
+  width: var(--col-custom-w, 150px);
+  min-width: var(--col-custom-w, 150px);
+}
+.col-type-config {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+}
+
 .grid-header-cell {
   min-width: 0; // crucial: allow cell to shrink and avoid overlap
   overflow: hidden;
@@ -159,6 +208,10 @@ $resize-helper-color: #2196f3;
     min-width: 100%;
     box-sizing: border-box;
   }
+}
+
+cdk-virtual-scroll-viewport.cdk-virtual-scrollable {
+  overflow-x: hidden;
 }
 
 /* Body sans virtual scroll (liste simple, même grille) */
