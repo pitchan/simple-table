@@ -39,7 +39,7 @@ import { DataSource } from '@angular/cdk/collections';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { TableStrategyFactory } from './strategies/strategy.factory';
 import { ITableStrategy } from './models/table-strategy.interface';
-import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode } from './models/column-def.model';
+import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode, SelectionMode } from './models/column-def.model';
 import { TableConfigEditorComponent } from '../table-config-editor/table-config-editor.component';
 import { ResizableColumnDirective, ResizableColumnEvent } from './directives/resizable-column.directive';
 import { TableResizeService, ColumnResizeEvent } from './services/table-resize.service';
@@ -138,7 +138,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   /** Table configuration */
   @Input() config!: TableConfig<T>;
 
-  /** Selection model for row selection */
+  /** Selection model optionnel (si non fourni et selectionMode !== 'none', la table en crée un en interne). */
   @Input() selection?: SelectionModel<T>;
 
   /** Enable debug logging */
@@ -171,6 +171,41 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild('resizeHelper') resizeHelper!: ElementRef<HTMLDivElement>;
   @ViewChild('gridTableElement', { read: ElementRef }) gridTableElementRef!: ElementRef<HTMLElement>;
+
+  // ========== SELECTION (signals, config-driven) ==========
+  // Les @Input() config et selection ne sont pas des signals : quand le parent les change,
+  // il faut mettre à jour ces signals dans ngOnChanges pour que les computed() réagissent.
+  // (Avec Angular 17+ et input(), on pourrait dériver tout en computed() sans ngOnChanges.)
+  /** Mode de sélection issu de la config (synchronisé dans ngOnChanges). */
+  private readonly selectionModeSignal = signal<SelectionMode | undefined>(undefined);
+  /** Flag features.selection pour rétrocompat (synchronisé dans ngOnChanges). */
+  private readonly selectionFeatureFlagSignal = signal<boolean | undefined>(undefined);
+  /** Sélection passée en @Input (synchronisée dans ngOnChanges). */
+  private readonly selectionInputSignal = signal<SelectionModel<T> | undefined>(undefined);
+  /** Modèle de sélection interne quand selectionMode est single/multiple et aucun @Input selection. */
+  private readonly selectionModel = signal<SelectionModel<T> | null>(null);
+
+  /** Modèle effectif : input si fourni, sinon modèle interne si mode !== 'none'. */
+  readonly effectiveSelection = computed(() => {
+    const mode = this.selectionModeSignal();
+    if (mode === 'none') return null;
+    const input = this.selectionInputSignal();
+    if (input !== undefined && input !== null) return input;
+    return this.selectionModel();
+  });
+
+  /** Colonne sélection visible : selectionMode !== 'none' ou (rétrocompat) features.selection === true. */
+  readonly selectionColumnVisible = computed(() => {
+    const mode = this.selectionModeSignal();
+    if (mode !== undefined) return mode !== 'none';
+    return this.selectionFeatureFlagSignal() === true;
+  });
+
+  /** Mode multiple (Select All affiché) déduit de la config ou du modèle. */
+  readonly isMultipleSelection = computed(() => {
+    if (this.selectionModeSignal() === 'multiple') return true;
+    return this.effectiveSelection()?.isMultipleSelection() ?? false;
+  });
 
   // ========== STRATEGY (internal) ==========
   private strategy!: ITableStrategy<T>;
@@ -207,6 +242,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     }
 
     this.validateInputs();
+    this.syncSelectionState();
+    this.ensureSelectionModel();
     this.initializeColumns();
     this.initializeConfigEditor();
     this.initializeStrategy();
@@ -217,14 +254,21 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    // Handle config changes - reinitialize columns
-    if (changes['config'] && !changes['config'].firstChange) {
-      if (this.debug) {
-        console.log('[SimpleTableV2] Config changed, reinitializing columns', changes['config'].currentValue);
+    if (changes['config']) {
+      this.syncSelectionState();
+      this.ensureSelectionModel();
+      if (!changes['config'].firstChange) {
+        if (this.debug) {
+          console.log('[SimpleTableV2] Config changed, reinitializing columns', changes['config'].currentValue);
+        }
+        this.initializeColumns();
+        this.initializeConfigEditor();
+        this.cdr.markForCheck();
       }
-      this.initializeColumns();
-      this.initializeConfigEditor();
-      this.cdr.markForCheck();
+    }
+    if (changes['selection']) {
+      this.selectionInputSignal.set(changes['selection'].currentValue ?? undefined);
+      this.ensureSelectionModel();
     }
 
     // Handle data changes AFTER AfterViewInit
@@ -329,7 +373,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
     // Build displayed columns array (add selector if selection enabled)
     this.displayedColumns = [];
-    if (this.selection && this.config.features?.selection !== false) {
+    if (this.selectionColumnVisible() && this.effectiveSelection() != null) {
       this.displayedColumns.push('select');
     }
     this.displayedColumns.push(...this.visibleColumns.map(col => col.id));
@@ -424,35 +468,53 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
   // ========== SELECTION ==========
   isAllSelected(): boolean {
-    if (!this.selection) return false;
-    const numSelected = this.selection.selected.length;
+    const sel = this.effectiveSelection();
+    if (!sel) return false;
+    const numSelected = sel.selected.length;
     const numRows = this.tableData().length;
     return numSelected === numRows && numRows > 0;
   }
 
   masterToggle(): void {
-    if (!this.selection || !this.isMultipleSelection) return;
+    const sel = this.effectiveSelection();
+    if (!sel || !this.isMultipleSelection()) return;
 
     if (this.isAllSelected()) {
-      this.selection.clear();
+      sel.clear();
     } else {
-      this.tableData().forEach(row => this.selection!.select(row));
+      this.tableData().forEach(row => sel.select(row));
     }
-    this.selectionChange.emit(this.selection);
+    this.selectionChange.emit(sel);
   }
 
   toggleSelection(row: T): void {
-    if (!this.selection) return;
-    this.selection.toggle(row);
-    this.selectionChange.emit(this.selection);
+    const sel = this.effectiveSelection();
+    if (!sel) return;
+    sel.toggle(row);
+    this.selectionChange.emit(sel);
+  }
+
+  private syncSelectionState(): void {
+    this.selectionModeSignal.set(this.config?.features?.selectionMode);
+    this.selectionFeatureFlagSignal.set(this.config?.features?.selection);
+    this.selectionInputSignal.set(this.selection ?? undefined);
+  }
+
+  private ensureSelectionModel(): void {
+    const mode = this.selectionModeSignal();
+    const input = this.selectionInputSignal();
+    if (mode === 'single' || mode === 'multiple') {
+      if (input === undefined || input === null) {
+        this.selectionModel.set(new SelectionModel<T>(mode === 'multiple', []));
+      } else {
+        this.selectionModel.set(null);
+      }
+    } else {
+      this.selectionModel.set(null);
+    }
   }
 
   // ========== HELPERS ==========
-  
-  /** Détecte si le mode de sélection est 'multiple' via l'API native du SelectionModel */
-  get isMultipleSelection(): boolean {
-    return this.selection?.isMultipleSelection() ?? false;
-  }
 
   private getDefaultWidthForType(type: string): number {
     const widthConfig = DEFAULT_COLUMN_WIDTHS[type as keyof typeof DEFAULT_COLUMN_WIDTHS];

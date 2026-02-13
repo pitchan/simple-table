@@ -131,6 +131,14 @@ export interface TableStatePatch {
 }
 
 /**
+ * Mode de sélection des lignes.
+ * - 'none' : pas de sélection, colonne checkbox masquée.
+ * - 'single' : une seule ligne sélectionnable, pas de "Select All".
+ * - 'multiple' : plusieurs lignes, avec "Select All" dans le header.
+ */
+export type SelectionMode = 'none' | 'single' | 'multiple';
+
+/**
  * Table features flags
  */
 export interface TableFeatures {
@@ -139,7 +147,10 @@ export interface TableFeatures {
   sort?: boolean;
   reorder?: boolean;
   edit?: boolean;
+  /** @deprecated Préférer selectionMode. Si true et selectionMode non défini, le mode est déduit du SelectionModel passé en @Input(). */
   selection?: boolean;
+  /** Mode de sélection : 'none' | 'single' | 'multiple'. Quand défini, la table crée le SelectionModel en interne si aucun n'est fourni. */
+  selectionMode?: SelectionMode;
   pagination?: boolean;
   /** Use CDK virtual scroll with grid layout (Option A). When true, header and body are divs in a grid. */
   virtualScroll?: boolean;

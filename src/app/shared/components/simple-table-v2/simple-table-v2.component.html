@@ -42,13 +42,13 @@
       <div class="grid-header-row" 
            [style.display]="'grid'"
            [style.grid-template-columns]="gridTemplateColumns()">
-        <ng-container *ngIf="selection && config.features?.selection !== false">
+        <ng-container *ngIf="selectionColumnVisible() && effectiveSelection()">
           <div class="grid-header-cell grid-header-cell--select" role="columnheader">
             <mat-checkbox
-              *ngIf="isMultipleSelection"
+              *ngIf="isMultipleSelection()"
               (change)="$event ? masterToggle() : null"
-              [checked]="selection.hasValue() && isAllSelected()"
-              [indeterminate]="selection.hasValue() && !isAllSelected()">
+              [checked]="effectiveSelection()!.hasValue() && isAllSelected()"
+              [indeterminate]="effectiveSelection()!.hasValue() && !isAllSelected()">
             </mat-checkbox>
           </div>
         </ng-container>
@@ -103,12 +103,12 @@
          [style.display]="'grid'"
          [style.grid-template-columns]="gridTemplateColumns()"
          role="row">
-      <ng-container *ngIf="selection && config.features?.selection !== false">
+      <ng-container *ngIf="selectionColumnVisible() && effectiveSelection()">
         <div class="grid-cell grid-cell--select" role="gridcell">
           <mat-checkbox
             (click)="$event.stopPropagation()"
             (change)="$event ? toggleSelection(row) : null"
-            [checked]="selection.isSelected(row)">
+            [checked]="effectiveSelection()!.isSelected(row)">
           </mat-checkbox>
         </div>
       </ng-container>

@@ -9,7 +9,6 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { delay, of } from 'rxjs';
-import { SelectionModel } from '@angular/cdk/collections';
 
 import { SimpleTableV2Component } from '../../shared/components/simple-table-v2/simple-table-v2.component';
 import { TableConfig, TableColumnDef } from '../../shared/components/simple-table-v2/models/column-def.model';
@@ -60,20 +59,6 @@ export class HomeComponent implements OnInit {
   /** Message d'erreur éventuel */
   errorMessage: string | null = null;
 
-  /**
-   * Modèle de sélection pour les checkboxes.
-   * 
-   * Mode multiple (true) : permet de sélectionner plusieurs lignes, affiche la checkbox "Select All" dans le header.
-   * Mode single (false) : permet de sélectionner une seule ligne, masque la checkbox "Select All" du header.
-   * 
-   * Exemples :
-   * - Mode multiple : new SelectionModel<Employee>(true, [])
-   * - Mode single : new SelectionModel<Employee>(false, [])
-   * 
-   * Le composant simple-table-v2 détecte automatiquement le mode via isMultipleSelection().
-   */
-  selection = new SelectionModel<Employee>(false, []);
-
   /** Nombre d'employés actifs (calculé) */
   get activesCount(): number {
     return this.employees.filter((e) => e.status === 'active').length;
@@ -95,15 +80,15 @@ export class HomeComponent implements OnInit {
     features: {
       sort: true,
       pagination: true,
-      selection: true,
+      selectionMode: 'single',
       resize: true,
-      virtualScroll: true, 
+      virtualScroll: true,
     },
     defaultPageSize: 5000,
     pageSizeOptions: [25, 50, 5000],
     stickyHeader: true,
     responsive: true,
-    columnResizeMode: 'fit',
+    columnResizeMode: 'expand',
   };
 
   // ────────────────────────────────────────────
