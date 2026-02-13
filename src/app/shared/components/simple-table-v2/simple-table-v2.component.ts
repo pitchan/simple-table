@@ -39,7 +39,7 @@ import { DataSource } from '@angular/cdk/collections';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { TableStrategyFactory } from './strategies/strategy.factory';
 import { ITableStrategy } from './models/table-strategy.interface';
-import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode, DEFAULT_TABLE_HEIGHT } from './models/column-def.model';
+import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode } from './models/column-def.model';
 import { TableConfigEditorComponent } from '../table-config-editor/table-config-editor.component';
 import { ResizableColumnDirective, ResizableColumnEvent } from './directives/resizable-column.directive';
 import { TableResizeService, ColumnResizeEvent } from './services/table-resize.service';
@@ -112,13 +112,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
   /** Cache de l'élément table */
   private tableEl?: HTMLElement;
-
-  // ========== DYNAMIC HEIGHT STATE ==========
-  /**
-   * Hauteur calculée du conteneur (px).
-   * Initialisée à minHeight pour éviter un flash visuel (grandir > rétrécir).
-   */
-  computedHeight: number = DEFAULT_TABLE_HEIGHT.minHeight;
 
   /**
    * True quand la hauteur du parent est inférieure à minHeight.
@@ -267,9 +260,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
     // Apply initial column widths on TH elements (DOM is ready now)
     this.applyInitialWidths();
-
-    // Setup dynamic height observer on parent container
-    this.setupHeightObserver();
 
     this.cdr.markForCheck();
 
@@ -774,78 +764,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     const columnType = column?.type ?? 'text';
     const defaultWidths = DEFAULT_COLUMN_WIDTHS[columnType as keyof typeof DEFAULT_COLUMN_WIDTHS] ?? DEFAULT_COLUMN_WIDTHS['text'];
     return column?.width?.max ?? defaultWidths.max;
-  }
-
-  // ========== DYNAMIC HEIGHT ==========
-
-  /**
-   * Observe le parent pour calculer la hauteur dynamique du conteneur.
-   *
-   * Contrainte de layout : le parent doit être un conteneur dédié avec une hauteur
-   * explicite (ex: height: calc(100vh - 64px), flex layout, etc.).
-   * C'est au consommateur de gérer ses paddings/margins.
-   * On prend parentHeight tel quel — simple, prévisible.
-   */
-  private setupHeightObserver(): void {
-    const parentEl = this.elementRef.nativeElement.parentElement;
-
-    // Guard : pas de parent → on garde la hauteur initiale (minHeight)
-    if (!parentEl) {
-      if (this.debug) {
-        console.warn('[SimpleTableV2] No parent element found, using default height');
-      }
-      return;
-    }
-
-    // Mesure 1-shot immédiate : couvre le premier rendu sans attendre le callback ResizeObserver
-    const initialHeight = parentEl.getBoundingClientRect().height;
-    if (initialHeight > 0) {
-      this.computeTableHeight(initialHeight);
-    }
-
-    this.ngZone.runOutsideAngular(() => {
-      this.resizeObserver = new ResizeObserver((entries) => {
-        const parentHeight = entries[0].contentRect.height;
-
-        // Guard : height 0 = onglet caché, accordéon fermé, transition de route
-        if (parentHeight <= 0) return;
-
-        this.computeTableHeight(parentHeight);
-      });
-      this.resizeObserver.observe(parentEl);
-    });
-  }
-
-  /**
-   * Calcule la hauteur du conteneur : clamp(parentHeight, minHeight, maxHeight).
-   *
-   * - minHeight est enforcé : la table ne descend jamais en dessous (600px par défaut).
-   * - maxHeight est enforcé : la table ne dépasse jamais (2000px par défaut).
-   * - Si parentHeight < minHeight, isHeightConstrained passe à true et la classe
-   *   `table--height-constrained` est exposée sur le host via @HostBinding.
-   */
-  private computeTableHeight(parentHeight: number): void {
-    const maxH = this.config?.height?.maxHeight ?? DEFAULT_TABLE_HEIGHT.maxHeight;
-    const minH = this.config?.height?.minHeight ?? DEFAULT_TABLE_HEIGHT.minHeight;
-
-    // clamp : jamais en dessous de minHeight, jamais au-dessus de maxHeight
-    const newHeight = Math.max(minH, Math.min(maxH, parentHeight));
-    const newConstrained = parentHeight < minH;
-
-    // Guard CD : pas de markForCheck si rien n'a changé
-    if (newHeight === this.computedHeight && newConstrained === this.isHeightConstrained) return;
-
-    this.computedHeight = newHeight;
-    this.isHeightConstrained = newConstrained;
-
-    if (this.debug && newConstrained) {
-      console.warn(
-        `[SimpleTableV2] Parent height (${parentHeight}px) < minHeight (${minH}px). ` +
-        `Table enforces minHeight. Class "table--height-constrained" added to host.`
-      );
-    }
-
-    this.cdr.markForCheck();
   }
 
   // ========== LIFECYCLE CLEANUP ==========

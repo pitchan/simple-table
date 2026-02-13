@@ -99,8 +99,8 @@ export class HomeComponent implements OnInit {
       resize: true,
       virtualScroll: true, 
     },
-    defaultPageSize: 100,
-    pageSizeOptions: [25, 50, 100],
+    defaultPageSize: 5000,
+    pageSizeOptions: [25, 50, 5000],
     stickyHeader: true,
     responsive: true,
     columnResizeMode: 'fit',
@@ -110,7 +110,7 @@ export class HomeComponent implements OnInit {
   // Lifecycle
   // ────────────────────────────────────────────
   ngOnInit(): void {
-    const generated = this.generateEmployees(100);
+    const generated = this.generateEmployees(5000);
 
     // Simulation d'un appel serveur (délai 800 ms)
     of(generated)
