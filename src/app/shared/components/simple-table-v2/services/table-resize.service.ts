@@ -463,8 +463,8 @@ export class TableResizeService {
       const w = this.columnWidthsByColId[colId];
       if (w != null) {
         const safeId = this.cssSafeColId(colId);
-        this.renderer.setStyle(containerEl, `--col-${safeId}-w`, `${w}px`);
-        this.renderer.setStyle(containerEl, `--col-${safeId}-left`, `${cumulativeLeft}px`);
+        containerEl.style.setProperty(`--col-${safeId}-w`, `${w}px`);
+        containerEl.style.setProperty(`--col-${safeId}-left`, `${cumulativeLeft}px`);
         cumulativeLeft += w;
       }
     });

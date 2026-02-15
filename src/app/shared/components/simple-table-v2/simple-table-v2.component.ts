@@ -14,7 +14,6 @@ import {
   OnInit,
   Output,
   Renderer2,
-  Signal,
   SimpleChanges,
   ViewChild,
   computed,
@@ -23,7 +22,6 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
-import { Observable } from 'rxjs';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -659,8 +657,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
         w = this.columnWidths.get(colId) ?? this.getDefaultWidthForType(col?.type ?? 'text');
       }
       const safe = this.cssSafeColId(colId);
-      this.renderer.setStyle(container, `--col-${safe}-w`, `${w}px`);
-      this.renderer.setStyle(container, `--col-${safe}-left`, `${cumulativeLeft}px`);
+      container.style.setProperty(`--col-${safe}-w`, `${w}px`);
+      container.style.setProperty(`--col-${safe}-left`, `${cumulativeLeft}px`);
       cumulativeLeft += w;
     });
 
