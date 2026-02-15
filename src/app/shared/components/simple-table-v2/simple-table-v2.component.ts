@@ -145,6 +145,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   /** Show column configuration editor (DISABLED IN THIS VERSION) */
   @Input() showConfigEditor = false;
 
+  /** Saved column widths (e.g. from localStorage); take priority over config/default. */
+  @Input() savedColumnWidths: Record<string, number> | null = null;
+
   // ========== OUTPUTS ==========
   /** Row click event */
   @Output() rowClick = new EventEmitter<T>();
@@ -269,6 +272,14 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       this.ensureSelectionModel();
     }
 
+    if (changes['savedColumnWidths'] && this.visibleColumns?.length) {
+      this.applySavedOrInitialWidths();
+      if (this.viewInitialized) {
+        this.applyInitialWidths();
+        this.cdr.markForCheck();
+      }
+    }
+
     // Handle data changes AFTER AfterViewInit
     // Before AfterViewInit, data is initialized in ngAfterViewInit()
     if (changes['data'] && this.viewInitialized && this.strategy) {
@@ -381,15 +392,23 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       this.displayedColumns.push('configButton');
     }
 
-    // Initialize column widths
-    this.visibleColumns.forEach(col => {
-      const width = col.width?.initial ?? this.getDefaultWidthForType(col.type ?? 'text');
-      this.columnWidths.set(col.id, width);
-    });
+    // Initialize column widths (saved > config > default)
+    this.applySavedOrInitialWidths();
 
     if (this.debug) {
       console.log('[SimpleTableV2] Columns initialized:', this.displayedColumns);
     }
+  }
+
+  /** Apply saved column widths with priority: savedColumnWidths > config initial > default by type. */
+  private applySavedOrInitialWidths(): void {
+    this.visibleColumns.forEach(col => {
+      const width =
+        this.savedColumnWidths?.[col.id] ??
+        col.width?.initial ??
+        this.getDefaultWidthForType(col.type ?? 'text');
+      this.columnWidths.set(col.id, width);
+    });
   }
 
   private initializeStrategy(): void {
@@ -804,6 +823,13 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
    */
   getInitialWidth(columnId: string): number {
     return this.columnWidths.get(columnId) ?? this.getDefaultWidthForType('text');
+  }
+
+  /**
+   * Get current column widths by colId (for parent persistence, e.g. localStorage).
+   */
+  getColumnWidths(): Record<string, number> {
+    return Object.fromEntries(this.columnWidths);
   }
 
   /**

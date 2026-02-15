@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   OnInit,
+  ViewChild,
   inject,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -50,6 +51,11 @@ export class HomeComponent implements OnInit {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
 
+  @ViewChild(SimpleTableV2Component) tableRef!: SimpleTableV2Component<Employee>;
+
+  /** Saved column widths (from localStorage); passed to table and updated on resize. */
+  savedColumnWidths: Record<string, number> | null = null;
+
   /** Données chargées — un tableau de 100 Employee */
   employees: Employee[] = [];
 
@@ -88,13 +94,23 @@ export class HomeComponent implements OnInit {
     pageSizeOptions: [25, 50, 5000],
     stickyHeader: true,
     responsive: true,
-    columnResizeMode: 'expand',
+    columnResizeMode: 'fit',
   };
 
   // ────────────────────────────────────────────
   // Lifecycle
   // ────────────────────────────────────────────
   ngOnInit(): void {
+    const key = 'tableColumnWidths_' + this.tableConfig.id;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      try {
+        this.savedColumnWidths = JSON.parse(raw);
+      } catch {
+        // ignore invalid stored data
+      }
+    }
+
     const generated = this.generateEmployees(5000);
 
     // Simulation d'un appel serveur (délai 800 ms)
@@ -124,6 +140,16 @@ export class HomeComponent implements OnInit {
 
   onHyperlinkClick(event: { row: Employee; column: string }): void {
     console.log('[Home] Lien cliqué :', event);
+  }
+
+  onColumnWidthChange(): void {
+    const widths = this.tableRef?.getColumnWidths();
+    if (widths != null && Object.keys(widths).length > 0) {
+      this.savedColumnWidths = widths;
+      const key = 'tableColumnWidths_' + this.tableConfig.id;
+      localStorage.setItem(key, JSON.stringify(this.savedColumnWidths));
+    }
+    this.cdr.markForCheck();
   }
 
   // ────────────────────────────────────────────
@@ -175,7 +201,7 @@ export class HomeComponent implements OnInit {
         type: 'text',
         sortable: true,
         accessor: (row) => row.jobTitle,
-        clamp: 2,
+        clamp: 1,
       },
       {
         id: 'salary',

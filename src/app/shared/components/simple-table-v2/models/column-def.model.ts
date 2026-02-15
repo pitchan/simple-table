@@ -84,6 +84,12 @@ export interface TableColumnDef<T = any> {
 }
 
 /**
+ * Column widths keyed by column id (e.g. for localStorage persistence).
+ * Use with SimpleTableV2Component @Input savedColumnWidths.
+ */
+export type SavedColumnWidths = Record<string, number>;
+
+/**
  * Table state (persistable to localStorage)
  */
 export interface TableState {
