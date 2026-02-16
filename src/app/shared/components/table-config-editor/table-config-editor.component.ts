@@ -37,6 +37,11 @@ export class TableConfigEditorComponent {
   readonly DISPLAY_MODE_MAPPING = 'mapping';
   readonly DISPLAY_MODE_HIERARCHY = 'hierarchy';
 
+  /** Libellé affiché pour une colonne (générique : header ou name, sans traduction). */
+  getColumnLabel(column: { header?: string; name?: string }): string {
+    return column?.header ?? column?.name ?? '';
+  }
+
   sortPredicate = (index: number, item: any) => {
     return true; // Allow all drops for now
   };

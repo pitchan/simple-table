@@ -77,7 +77,7 @@
              (resizeBegin)="onColumnResizeBegin($event)"
              (resizeEnd)="onColumnResizeEnd($event)"
              (click)="config.features?.sort !== false && column.sortable !== false && !isResizing ? onVirtualSortHeaderClick(column.id) : null">
-          <span class="header-label">{{ getColumnHeader(column) }}</span>
+          <span class="header-label">{{ column.i18n ? (column.i18n | translate) : column.header }}</span>
         </div>
       </div>
 
