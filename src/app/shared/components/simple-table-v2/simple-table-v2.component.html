@@ -29,6 +29,19 @@
     <mat-spinner diameter="50"></mat-spinner>
   </div>
 
+  <!-- Config toolbar: cog above table, right-aligned (avoids resize/layout issues) -->
+  <div class="table-toolbar" *ngIf="showConfigEditor">
+    <span class="spacer"></span>
+    <button
+      mat-icon-button
+      [matMenuTriggerFor]="configMenu"
+      [matTooltip]="'COMMON.CONFIGURE_COLUMNS' | translate"
+      type="button"
+      aria-label="Configurer les colonnes">
+      <mat-icon>settings</mat-icon>
+    </button>
+  </div>
+
   <!-- Single grid (div-based): one wrapper, one header, body with ngIf on virtual scroll only -->
   <div class="table-wrapper" 
        [class.table-wrapper--virtual]="config.features?.virtualScroll" 
@@ -66,16 +79,6 @@
              (click)="config.features?.sort !== false && column.sortable !== false && !isResizing ? onVirtualSortHeaderClick(column.id) : null">
           <span class="header-label">{{ getColumnHeader(column) }}</span>
         </div>
-        <ng-container *ngIf="showConfigEditor">
-          <div class="grid-header-cell grid-header-cell--config" role="columnheader">
-            <button 
-              mat-icon-button 
-              [matMenuTriggerFor]="configMenu"
-              matTooltip="{{ 'COMMON.CONFIGURE_COLUMNS' | translate }}">
-              <mat-icon>more_vert</mat-icon>
-            </button>
-          </div>
-        </ng-container>
       </div>
 
       <!-- Body: virtual scroll -->
@@ -137,9 +140,6 @@
           </button>
         </ng-container>
       </div>
-      <ng-container *ngIf="showConfigEditor">
-        <div class="grid-cell grid-cell--config" role="gridcell"></div>
-      </ng-container>
     </div>
       </ng-template>
     </div>

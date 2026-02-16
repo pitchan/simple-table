@@ -113,6 +113,9 @@ export interface TableState {
 
   /** Hidden columns (columnId → hidden) */
   hiddenColumns?: Record<string, boolean>;
+
+  /** Sticky column state (columnId → 'start' | 'end' | boolean) */
+  stickyColumns?: Record<string, 'start' | 'end' | boolean>;
 }
 
 /**
@@ -134,6 +137,7 @@ export interface TableStatePatch {
   filters?: Partial<Record<string, any>>;
   density?: TableState['density'];
   hiddenColumns?: Partial<Record<string, boolean>>;
+  stickyColumns?: Partial<Record<string, 'start' | 'end' | boolean>>;
 }
 
 /**

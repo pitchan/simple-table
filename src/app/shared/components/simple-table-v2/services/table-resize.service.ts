@@ -332,13 +332,13 @@ export class TableResizeService {
 
     const helperLeft = helperElement.offsetLeft;
     const delta = helperLeft - this.state.lastHelperX;
-    
+
     // Check for RTL support
     const isRTL = DomHandler.isRTL(containerElement);
     const adjustedDelta = isRTL ? -delta : delta;
 
     const minWidth = this.config.minColumnWidth;
-    
+
     // Clamp new column width to minimum
     const rawNewColumnWidth = this.state.startWidth + adjustedDelta;
     const newColumnWidth = Math.max(rawNewColumnWidth, minWidth);
@@ -420,9 +420,19 @@ export class TableResizeService {
 
     this.columnWidthsByColId[this.state.columnId] = finalColumnWidth;
 
-    const newTableWidth = this.originalTableWidth + finalDelta;
-    this.renderer.setStyle(tableElement, 'width', `${newTableWidth}px`);
-    this.renderer.setStyle(tableElement, 'min-width', `${newTableWidth}px`);
+    // Last column (no next): in fit mode do not set table width (stays 100%).
+    // In expand mode set table width to new sum so the column visibly grows.
+    // Non-last column: change table width by delta.
+    if (this.state.nextColumnId != null) {
+      const newTableWidth = this.originalTableWidth + finalDelta;
+      this.renderer.setStyle(tableElement, 'width', `${newTableWidth}px`);
+      this.renderer.setStyle(tableElement, 'min-width', `${newTableWidth}px`);
+    } else if (this.config.columnResizeMode === 'expand') {
+      const ids = this.orderedColumnIds.length ? this.orderedColumnIds : Object.keys(this.columnWidthsByColId);
+      const sumW = ids.reduce((s, id) => s + (this.columnWidthsByColId[id] ?? 0), 0);
+      this.renderer.setStyle(tableElement, 'width', `${sumW}px`);
+      this.renderer.setStyle(tableElement, 'min-width', `${sumW}px`);
+    }
 
     const container = tableElement.closest(this.config.containerSelector) as HTMLElement;
     if (container) this.applyWidthsToContainer(container);

@@ -7,9 +7,11 @@ import {
   HostBinding,
   Input,
   NgZone,
+  OnChanges,
   OnDestroy,
   Output,
   Renderer2,
+  SimpleChanges,
   inject,
   booleanAttribute,
 } from '@angular/core';
@@ -57,7 +59,7 @@ export interface ResizableColumnEvent {
     'class': 'p-resizable-column'
   }
 })
-export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
+export class ResizableColumnDirective implements AfterViewInit, OnChanges, OnDestroy {
   // ========== INJECTIONS ==========
   private readonly document = inject(DOCUMENT);
   private readonly renderer = inject(Renderer2);
@@ -92,10 +94,30 @@ export class ResizableColumnDirective implements AfterViewInit, OnDestroy {
   private upListener: (() => void) | null = null;
   private cancelListener: (() => void) | null = null;
 
+  /** True after ngAfterViewInit has run (avoids creating resizer before view is ready in ngOnChanges) */
+  private _viewInitDone = false;
+
   // ========== LIFECYCLE ==========
   ngAfterViewInit(): void {
     if (this.isEnabled()) {
       this.createResizer();
+    }
+    this._viewInitDone = true;
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    const disabledChange = changes['pResizableColumnDisabled'];
+    if (!disabledChange || disabledChange.firstChange) {
+      return;
+    }
+    if (this.pResizableColumnDisabled) {
+      if (this.resizer != null && !this._resizing) {
+        this.destroyResizer();
+      }
+    } else {
+      if (this._viewInitDone && this.resizer === null) {
+        this.createResizer();
+      }
     }
   }
 

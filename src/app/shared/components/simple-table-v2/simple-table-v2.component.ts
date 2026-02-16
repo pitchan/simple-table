@@ -37,10 +37,10 @@ import { DataSource } from '@angular/cdk/collections';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { TableStrategyFactory } from './strategies/strategy.factory';
 import { ITableStrategy } from './models/table-strategy.interface';
-import { TableColumnDef, TableConfig, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode, SelectionMode } from './models/column-def.model';
+import { TableColumnDef, TableConfig, TableState, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode, SelectionMode } from './models/column-def.model';
 import { TableConfigEditorComponent } from '../table-config-editor/table-config-editor.component';
 import { ResizableColumnDirective, ResizableColumnEvent } from './directives/resizable-column.directive';
-import { TableResizeService, ColumnResizeEvent } from './services/table-resize.service';
+import { TableResizeService } from './services/table-resize.service';
 import { DomHandler } from './helpers/dom-handler';
 
 /**
@@ -142,11 +142,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   /** Enable debug logging */
   @Input() debug = false;
 
-  /** Show column configuration editor (DISABLED IN THIS VERSION) */
+  /** Show column configuration editor (menu with column order, visibility, sticky). */
   @Input() showConfigEditor = false;
-
-  /** Saved column widths (e.g. from localStorage); take priority over config/default. */
-  @Input() savedColumnWidths: Record<string, number> | null = null;
 
   // ========== OUTPUTS ==========
   /** Row click event */
@@ -163,9 +160,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
   /** Page change event (for external handling) */
   @Output() pageChange = new EventEmitter<PageEvent>();
-
-  /** Column width change event (for localStorage persistence) */
-  @Output() columnWidthChange = new EventEmitter<ColumnResizeEvent>();
 
   // ========== VIEW CHILDREN ==========
   @ViewChild(MatSort) sort!: MatSort;
@@ -245,6 +239,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     this.validateInputs();
     this.syncSelectionState();
     this.ensureSelectionModel();
+    const state = this.readTableStateFromStorage();
+    if (state) this.applyTableStateToConfig(state);
     this.initializeColumns();
     this.initializeConfigEditor();
     this.initializeStrategy();
@@ -262,22 +258,19 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
         if (this.debug) {
           console.log('[SimpleTableV2] Config changed, reinitializing columns', changes['config'].currentValue);
         }
+        const state = this.readTableStateFromStorage();
+        if (state) this.applyTableStateToConfig(state);
         this.initializeColumns();
         this.initializeConfigEditor();
+        if (this.viewInitialized) {
+          this.applyInitialWidths();
+        }
         this.cdr.markForCheck();
       }
     }
     if (changes['selection']) {
       this.selectionInputSignal.set(changes['selection'].currentValue ?? undefined);
       this.ensureSelectionModel();
-    }
-
-    if (changes['savedColumnWidths'] && this.visibleColumns?.length) {
-      this.applySavedOrInitialWidths();
-      if (this.viewInitialized) {
-        this.applyInitialWidths();
-        this.cdr.markForCheck();
-      }
     }
 
     // Handle data changes AFTER AfterViewInit
@@ -314,11 +307,25 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     // Apply initial column widths on TH elements (DOM is ready now)
     this.applyInitialWidths();
 
+    this.setupContainerResizeObserverForFitLastColumn();
+
     this.cdr.markForCheck();
 
     if (this.debug) {
       console.groupEnd();
     }
+  }
+
+  /** When container is resized: in fit mode fill last column; in expand mode fill last column if no horizontal scroll. */
+  private setupContainerResizeObserverForFitLastColumn(): void {
+    const container = this.getWrapper();
+    if (!container || this.resizeObserver) return;
+
+    this.resizeObserver = new ResizeObserver(() => {
+      if (this.columnResizeMode === 'fit') this.fitLastColumnToRemainingWidth();
+      else if (this.columnResizeMode === 'expand') this.expandModeFillLastColumnIfNoScroll();
+    });
+    this.resizeObserver.observe(container);
   }
 
   // ========== CONFIG EDITOR ==========
@@ -343,21 +350,92 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     }
   }
 
-  handleConfigChange(event: any): void {
-    // Event contains the updated columns structure
-    // We need to trigger a re-render of columns
-    
-    // The editor mutates the array passed to it (this.editorOptions.columns.columns)
-    // which references this.config.columns.
-    // So we just need to re-initialize visible columns.
-    
+  handleConfigChange(_event: any): void {
+    const prevVisibleCount = this.displayedColumns.length;
     this.initializeColumns();
+    if (this.columnResizeMode === 'fit' && this.displayedColumns.length > prevVisibleCount) {
+      this.columnWidths.clear();
+      this.applyColumnWidthsFromStateOrDefaults();
+    }
+    if (this.viewInitialized) this.applyInitialWidths();
+    this.writeTableStateToStorage(this.buildTableState());
     this.cdr.markForCheck();
   }
 
   handleAutoResize(event: boolean): void {
     if (this.debug) console.log('Auto resize toggled', event);
     // Not implemented yet
+  }
+
+  // ========== TABLE STATE PERSISTENCE (localStorage) ==========
+  private getTableStateStorageKey(): string {
+    return `tableState_${this.config?.id ?? ''}`;
+  }
+
+  private readTableStateFromStorage(): TableState | null {
+    const key = this.getTableStateStorageKey();
+    if (!key) return null;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as TableState;
+      return parsed?.columnOrder ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private applyTableStateToConfig(state: TableState): void {
+    if (!this.config?.columns?.length) return;
+    const order = state.columnOrder;
+    if (order?.length) {
+      const byId = new Map(this.config.columns.map(c => [c.id, c]));
+      const ordered: TableColumnDef<T>[] = [];
+      for (const id of order) {
+        const col = byId.get(id);
+        if (col) ordered.push(col);
+      }
+      for (const col of this.config.columns) {
+        if (!order.includes(col.id)) ordered.push(col);
+      }
+      this.config.columns.length = 0;
+      this.config.columns.push(...ordered);
+    }
+    this.config.columns.forEach(col => {
+      if (state.hiddenColumns && col.id in state.hiddenColumns) col.hidden = state.hiddenColumns[col.id];
+      if (state.stickyColumns && col.id in state.stickyColumns) col.sticky = state.stickyColumns[col.id];
+    });
+    if (state.columnWidths && typeof state.columnWidths === 'object') {
+      Object.entries(state.columnWidths).forEach(([id, w]) => {
+        if (id !== 'select') this.columnWidths.set(id, w);
+      });
+    }
+  }
+
+  private buildTableState(): TableState {
+    const columns = this.config?.columns ?? [];
+    const columnWidths: Record<string, number> = {};
+    this.columnWidths.forEach((w, id) => {
+        if (id !== 'select') columnWidths[id] = w;
+    });
+    return {
+      columnOrder: columns.map(c => c.id),
+      columnWidths,
+      sort: { active: '', direction: '' },
+      filters: {},
+      hiddenColumns: Object.fromEntries(columns.map(c => [c.id, !!c.hidden])),
+      stickyColumns: Object.fromEntries(columns.map(c => [c.id, c.sticky]).filter(([, v]) => v !== undefined)),
+    };
+  }
+
+  private writeTableStateToStorage(state: TableState): void {
+    const key = this.getTableStateStorageKey();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch {
+      // ignore quota / private mode
+    }
   }
 
   // ========== INITIALIZATION ==========
@@ -386,28 +464,24 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       this.displayedColumns.push('select');
     }
     this.displayedColumns.push(...this.visibleColumns.map(col => col.id));
-    
-    // Add config button column at the end if enabled
-    if (this.showConfigEditor) {
-      this.displayedColumns.push('configButton');
-    }
 
-    // Initialize column widths (saved > config > default)
-    this.applySavedOrInitialWidths();
+    this.applyColumnWidthsFromStateOrDefaults();
 
     if (this.debug) {
       console.log('[SimpleTableV2] Columns initialized:', this.displayedColumns);
     }
   }
 
-  /** Apply saved column widths with priority: savedColumnWidths > config initial > default by type. */
-  private applySavedOrInitialWidths(): void {
+  /** Set column width only when not already set (state from localStorage has priority). */
+  private applyColumnWidthsFromStateOrDefaults(): void {
     this.visibleColumns.forEach(col => {
-      const width =
-        this.savedColumnWidths?.[col.id] ??
-        col.width?.initial ??
-        this.getDefaultWidthForType(col.type ?? 'text');
-      this.columnWidths.set(col.id, width);
+      const current = this.columnWidths.get(col.id);
+      if (current == null) {
+        this.columnWidths.set(
+          col.id,
+          col.width?.initial ?? this.getDefaultWidthForType(col.type ?? 'text')
+        );
+      }
     });
   }
 
@@ -659,27 +733,110 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   /**
-   * Apply initial column widths as CSS variables on the container root.
+   * Apply current column widths (from columnWidths map or defaults) as CSS variables on the container.
    * Header and body cells consume width via var(--col-{colId}-w).
    */
-  private applyInitialWidths(): void {
+  private applyWidthsAsCssVarsToContainer(): void {
     const container = this.getWrapper();
     if (!container) return;
 
     let cumulativeLeft = 0;
     this.displayedColumns.forEach((colId) => {
-      let w: number;
-      if (colId === 'select' || colId === 'configButton') {
-        w = 48;
-      } else {
-        const col = this.getColumn(colId);
-        w = this.columnWidths.get(colId) ?? this.getDefaultWidthForType(col?.type ?? 'text');
-      }
+      const w = this.getWidthForColumn(colId);
       const safe = this.cssSafeColId(colId);
       container.style.setProperty(`--col-${safe}-w`, `${w}px`);
       container.style.setProperty(`--col-${safe}-left`, `${cumulativeLeft}px`);
       cumulativeLeft += w;
     });
+  }
+
+  /** Width for a column (select = 48, else columnWidths or default by type). */
+  private getWidthForColumn(colId: string): number {
+    if (colId === 'select') return 48;
+    const col = this.getColumn(colId);
+    return this.columnWidths.get(colId) ?? this.getDefaultWidthForType(col?.type ?? 'text');
+  }
+
+  /**
+   * Set last visible column width to fill available space and apply to DOM.
+   * @param availableWidth - Width to distribute (container or wrapper clientWidth).
+   * @param updateTableWidth - If true (expand mode), set grid-table width to new sum.
+   */
+  private setLastColumnToFillRemaining(availableWidth: number, updateTableWidth: boolean): void {
+    if (this.displayedColumns.length < 2) return;
+    const lastColId = this.displayedColumns[this.displayedColumns.length - 1]!;
+    if (lastColId === 'select') return;
+
+    let sumOthers = 0;
+    for (let i = 0; i < this.displayedColumns.length - 1; i++) {
+      sumOthers += this.getWidthForColumn(this.displayedColumns[i]!);
+    }
+    const lastWidth = Math.max(this.getMinWidth(lastColId), availableWidth - sumOthers);
+    this.columnWidths.set(lastColId, lastWidth);
+    this.applyWidthsAsCssVarsToContainer();
+
+    if (updateTableWidth) {
+      const tableEl = this.getTableElement();
+      if (tableEl) {
+        const sumW = this.displayedColumns.reduce((s, id) => s + this.getWidthForColumn(id), 0);
+        this.renderer.setStyle(tableEl, 'width', `${sumW}px`);
+        this.renderer.setStyle(tableEl, 'min-width', `${sumW}px`);
+      }
+    }
+
+    const container = this.getWrapper();
+    if (container) {
+      this.resizeService.setColumnWidthsByColId(
+        this.getColumnWidths(),
+        this.displayedColumns,
+        container
+      );
+    }
+    this.cdr.markForCheck();
+  }
+
+  /** Fit mode: last column fills remaining container width. */
+  private fitLastColumnToRemainingWidth(): void {
+    if (this.columnResizeMode !== 'fit') return;
+    const container = this.getWrapper();
+    if (!container || container.clientWidth <= 0) return;
+    this.setLastColumnToFillRemaining(container.clientWidth, false);
+  }
+
+  /** Expand mode: if no horizontal scroll, last column fills remaining wrapper width. */
+  private expandModeFillLastColumnIfNoScroll(): void {
+    if (this.columnResizeMode !== 'expand') return;
+    const wrapper = this.elementRef.nativeElement.querySelector('.table-wrapper') as HTMLElement;
+    if (!wrapper || wrapper.scrollWidth > wrapper.clientWidth || wrapper.clientWidth <= 0) return;
+    this.setLastColumnToFillRemaining(wrapper.clientWidth, true);
+  }
+
+  /**
+   * Apply initial column widths as CSS variables.
+   * Fit: schedule last column to fill remaining. Expand: set table width, then schedule fill if no scroll.
+   */
+  private applyInitialWidths(): void {
+    this.applyWidthsAsCssVarsToContainer();
+
+    const tableEl = this.getTableElement();
+    if (tableEl) {
+      if (this.columnResizeMode === 'expand') {
+        const sumW = this.displayedColumns.reduce((s, id) => s + this.getWidthForColumn(id), 0);
+        this.renderer.setStyle(tableEl, 'width', `${sumW}px`);
+        this.renderer.setStyle(tableEl, 'min-width', `${sumW}px`);
+      } else {
+        this.renderer.removeStyle(tableEl, 'width');
+        this.renderer.removeStyle(tableEl, 'min-width');
+      }
+    }
+
+    const lastId = this.displayedColumns.length >= 2 ? this.displayedColumns[this.displayedColumns.length - 1] : null;
+    if (lastId && lastId !== 'select') {
+      requestAnimationFrame(() => {
+        if (this.columnResizeMode === 'fit') this.fitLastColumnToRemainingWidth();
+        else if (this.columnResizeMode === 'expand') this.expandModeFillLastColumnIfNoScroll();
+      });
+    }
 
     if (this.debug) {
       console.log('[SimpleTableV2] Initial CSS var widths applied on container');
@@ -693,7 +850,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
   /** Return width style for a column (var with fallback so grid always has valid track sizes) */
   getColWidthStyle(colId: string): string {
-    if (colId === 'select' || colId === 'configButton') return '48px';
+    if (colId === 'select') return '48px';
     const safe = this.cssSafeColId(colId);
     const fallback = this.columnWidths.get(colId) ?? this.getDefaultWidthForType(this.getColumn(colId)?.type ?? 'text');
     return `var(--col-${safe}-w, ${fallback}px)`;
@@ -701,7 +858,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
   /** Return left offset for sticky columns (used with position: sticky) */
   getColLeftStyle(colId: string): string {
-    if (colId === 'select' || colId === 'configButton') return '0px';
+    if (colId === 'select') return '0px';
     return `var(--col-${this.cssSafeColId(colId)}-left)`;
   }
 
@@ -749,7 +906,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
     // Begin resize operation
     this.resizeService.beginResize(event.originalEvent, event.element, containerEl, helperEl);
-    
+
     // Set resizing flag to disable sort
     this.isResizing = true;
     
@@ -779,16 +936,12 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     // Remove resizing class from document body
     DomHandler.removeClass(document.body, 'p-unselectable-text');
 
-    // Emit event for external persistence if we have a valid result
     if (resizeResult) {
       const byColId = this.resizeService.getColumnWidthsByColId();
       Object.entries(byColId).forEach(([id, w]) => this.columnWidths.set(id, w));
-
-      this.columnWidthChange.emit(resizeResult);
-
-      if (this.debug) {
-        console.log('[SimpleTableV2] Resize end:', resizeResult);
-      }
+      this.columnWidths.set(resizeResult.columnId, resizeResult.width);
+      this.writeTableStateToStorage(this.buildTableState());
+      if (this.debug) console.log('[SimpleTableV2] Resize end:', resizeResult);
     }
 
     // Reset resizing flag with a small delay to prevent sort trigger on mouseup

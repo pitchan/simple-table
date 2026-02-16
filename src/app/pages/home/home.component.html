@@ -52,10 +52,9 @@
           <app-simple-table-v2
             [data]="employees"
             [config]="tableConfig"
-            [savedColumnWidths]="savedColumnWidths"
+            [showConfigEditor]="true"
             (rowClick)="onRowClick($event)"
-            (hyperlinkClick)="onHyperlinkClick($event)"
-            (columnWidthChange)="onColumnWidthChange()">
+            (hyperlinkClick)="onHyperlinkClick($event)">
           </app-simple-table-v2>
         </div>
       </section>

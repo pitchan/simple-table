@@ -94,6 +94,32 @@ describe('ResizableColumnDirective', () => {
       
       disabledFixture.destroy();
     }));
+
+    it('should create resizer when pResizableColumnDisabled changes from true to false (e.g. column no longer last in fit mode)', fakeAsync(() => {
+      const disabledFixture = TestBed.createComponent(TestHostComponent);
+      disabledFixture.componentInstance.disabled = true;
+      disabledFixture.detectChanges();
+      tick();
+
+      const disabledTh = disabledFixture.debugElement.query(By.directive(ResizableColumnDirective));
+      expect(disabledTh.nativeElement.querySelector('.p-datatable-column-resizer')).toBeFalsy();
+
+      disabledFixture.componentInstance.disabled = false;
+      disabledFixture.detectChanges();
+      tick();
+
+      expect(disabledTh.nativeElement.querySelector('.p-datatable-column-resizer')).toBeTruthy();
+      disabledFixture.destroy();
+    }));
+
+    it('should remove resizer when pResizableColumnDisabled changes from false to true', () => {
+      expect(thElement.nativeElement.querySelector('.p-datatable-column-resizer')).toBeTruthy();
+
+      hostComponent.disabled = true;
+      fixture.detectChanges();
+
+      expect(thElement.nativeElement.querySelector('.p-datatable-column-resizer')).toBeFalsy();
+    });
   });
 
   describe('Resize Events', () => {
