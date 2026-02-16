@@ -680,6 +680,20 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     return column.formatter ? column.formatter(value, row) : value;
   }
 
+  /**
+   * Optimized icon cell display: single getCellValue call, returns icon + value.
+   * check: true | 'Yes' (case-insensitive)
+   * close: false | 'No' (case-insensitive)
+   * text fallback: otherwise
+   */
+  getIconCellDisplay(row: T, column: TableColumnDef<T>): { icon: 'check' | 'close' | null; value: any } {
+    const value = this.getCellValue(row, column);
+    const s = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (value === true || s === 'yes') return { icon: 'check', value };
+    if (value === false || s === 'no') return { icon: 'close', value };
+    return { icon: null, value };
+  }
+
   trackByColumnId(index: number, column: TableColumnDef<T>): string {
     return column.id;
   }

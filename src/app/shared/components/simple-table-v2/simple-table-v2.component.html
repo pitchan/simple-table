@@ -129,9 +129,11 @@
           <a href="javascript:void(0)" class="cell-link" [class.clamp]="column.clamp != null" [style.--clamp-value]="column.clamp" (click)="onHyperlinkClick($event, row, column.id)">{{ getCellValue(row, column) }}</a>
         </ng-container>
         <ng-container *ngIf="column.type === 'icon'">
-          <mat-icon *ngIf="getCellValue(row, column) === true">check</mat-icon>
-          <mat-icon *ngIf="getCellValue(row, column) === false">close</mat-icon>
-          <span *ngIf="getCellValue(row, column) !== true && getCellValue(row, column) !== false" class="cell-content">{{ getCellValue(row, column) }}</span>
+          <ng-container *ngIf="getIconCellDisplay(row, column) as display">
+            <mat-icon *ngIf="display.icon === 'check'">check</mat-icon>
+            <mat-icon *ngIf="display.icon === 'close'">close</mat-icon>
+            <span *ngIf="display.icon === null" class="cell-content">{{ display.value }}</span>
+          </ng-container>
         </ng-container>
         <ng-container *ngIf="column.type === 'button' && column.actions">
           <button *ngFor="let action of column.actions" mat-icon-button [matTooltip]="action.label || ''" (click)="onHyperlinkClick($event, row, action.handlerId)">
