@@ -21,7 +21,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { CommonModule } from '@angular/common';
+import { CommonModule, JsonPipe } from '@angular/common';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -38,10 +38,10 @@ import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sour
 import { TableStrategyFactory } from './strategies/strategy.factory';
 import { ITableStrategy } from './models/table-strategy.interface';
 import { TableColumnDef, TableConfig, TableState, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode, SelectionMode } from './models/column-def.model';
-import { TableConfigEditorComponent } from '../table-config-editor/table-config-editor.component';
 import { ResizableColumnDirective, ResizableColumnEvent } from './directives/resizable-column.directive';
 import { TableResizeService } from './services/table-resize.service';
 import { DomHandler } from './helpers/dom-handler';
+import { TableConfigEditorComponentV2 } from '../table-config-editor-v2/table-config-editor.component';
 
 /**
  * SimpleTableV2Component - Refactored with Strategy Pattern
@@ -89,8 +89,8 @@ import { DomHandler } from './helpers/dom-handler';
     MatProgressSpinnerModule,
     TranslateModule,
     ResizableColumnDirective,
-    TableConfigEditorComponent,
-    ScrollingModule
+    TableConfigEditorComponentV2,
+    ScrollingModule,
   ],
   providers: [TableResizeService],
 })
@@ -98,7 +98,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly elementRef = inject(ElementRef);
-  private readonly ngZone = inject(NgZone);
   private readonly renderer = inject(Renderer2);
   private readonly resizeService = inject(TableResizeService);
 
@@ -680,20 +679,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     return column.formatter ? column.formatter(value, row) : value;
   }
 
-  /**
-   * Optimized icon cell display: single getCellValue call, returns icon + value.
-   * check: true | 'Yes' (case-insensitive)
-   * close: false | 'No' (case-insensitive)
-   * text fallback: otherwise
-   */
-  getIconCellDisplay(row: T, column: TableColumnDef<T>): { icon: 'check' | 'close' | null; value: any } {
-    const value = this.getCellValue(row, column);
-    const s = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    if (value === true || s === 'yes') return { icon: 'check', value };
-    if (value === false || s === 'no') return { icon: 'close', value };
-    return { icon: null, value };
-  }
-
   trackByColumnId(index: number, column: TableColumnDef<T>): string {
     return column.id;
   }
@@ -728,13 +713,31 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     if (this.config?.features?.sort === false) return;
     const sort = this.strategy.getSort?.() ?? { active: null, direction: 'asc' as 'asc' | 'desc' };
     const nextDir = sort.active === columnId && sort.direction === 'asc' ? 'desc' : 'asc';
-    this.strategy.setSort?.(columnId, nextDir);
+    
+    // Try to use strategy's setSort if available (e.g., FilterableDataSourceStrategy)
+    const strategyHandledSort = this.strategy.setSort?.(columnId, nextDir);
     this.sortChange.emit({ active: columnId, direction: nextDir });
-    // Syncer MatSort pour les strategies qui utilisent attachSort (ex. FilterableDataSource)
-    if (this.sort) {
+    
+    // Fallback: Programmatically trigger MatSort for strategies without setSort()
+    // Skip this if strategy has setSort() to avoid triggering server reload
+    if (this.sort && !this.strategy.setSort) {
       this.sort.sort({ id: columnId, start: nextDir, disableClear: true });
     }
+    
     this.cdr.markForCheck();
+  }
+
+  /**
+   * Get sort state for a specific column (for displaying sort arrows)
+   * @param columnId - Column identifier
+   * @returns Object with isSorted and direction properties
+   */
+  getSortState(columnId: string): { isSorted: boolean; direction: 'asc' | 'desc' | '' } {
+    const sort = this.strategy.getSort?.() ?? { active: null, direction: 'asc' as 'asc' | 'desc' };
+    return {
+      isSorted: sort.active === columnId,
+      direction: sort.active === columnId ? sort.direction : ''
+    };
   }
 
   // ========== COLUMN WIDTH MANAGEMENT ==========
@@ -874,6 +877,20 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   getColLeftStyle(colId: string): string {
     if (colId === 'select') return '0px';
     return `var(--col-${this.cssSafeColId(colId)}-left)`;
+  }
+
+  /**
+   * Optimized icon cell display: single getCellValue call, returns icon + value.
+   * check: true | 'Yes' (case-insensitive)
+   * close: false | 'No' (case-insensitive)
+   * text fallback: otherwise
+   */
+  getIconCellDisplay(row: T, column: TableColumnDef<T>): { icon: 'check' | 'close' | null; value: any } {
+    const value = this.getCellValue(row, column);
+    const s = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (value === true || s === 'yes') return { icon: 'check', value };
+    if (value === false || s === 'no') return { icon: 'close', value };
+    return { icon: null, value };
   }
 
   // ========== COLUMN RESIZE HANDLERS (PrimeNG-style) ==========

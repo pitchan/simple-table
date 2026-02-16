@@ -76,8 +76,14 @@
              [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false || (colIndex === visibleColumns.length - 1 && columnResizeMode === 'fit')"
              (resizeBegin)="onColumnResizeBegin($event)"
              (resizeEnd)="onColumnResizeEnd($event)"
-             (click)="config.features?.sort !== false && column.sortable !== false && !isResizing ? onVirtualSortHeaderClick(column.id) : null">
+             (click)="config.features?.sort !== false && column.sortable !== false && !isResizing ? onVirtualSortHeaderClick(column.id) : null"
+             [class.sortable]="config.features?.sort !== false && column.sortable !== false"
+             [class.sorted]="getSortState(column.id).isSorted">
           <span class="header-label">{{ column.i18n ? (column.i18n | translate) : column.header }}</span>
+          <mat-icon *ngIf="config.features?.sort !== false && column.sortable !== false && getSortState(column.id).isSorted" 
+                    class="sort-icon">
+            {{ getSortState(column.id).direction === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+          </mat-icon>
         </div>
       </div>
 
@@ -150,14 +156,14 @@
   <!-- Column Configuration Menu -->
   <mat-menu #configMenu="matMenu" xPosition="before" class="table-config-menu-panel">
     <div (click)="$event.stopPropagation()" class="config-menu-wrapper">
-      <app-table-config-editor
+      <app-table-config-editor-v2
         [options]="editorOptions"
         [tableColumnDefaultConfig]="{}"
         [hasLockOption]="true"
         [hasResponsiveOption]="false"
         (onTableColumnChangeEvent)="handleConfigChange($event)"
         (autoResizeChangeEvent)="handleAutoResize($event)">
-      </app-table-config-editor>
+      </app-table-config-editor-v2>
     </div>
   </mat-menu>
 

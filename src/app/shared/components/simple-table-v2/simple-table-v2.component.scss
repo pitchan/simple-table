@@ -196,6 +196,32 @@ $resize-helper-color: #2196f3;
     align-items: center;
     justify-content: center;
   }
+
+  // Sortable column styles
+  &.sortable {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  &.sorted {
+    font-weight: 600;
+  }
+
+  .sort-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
 }
 
 .grid-viewport {

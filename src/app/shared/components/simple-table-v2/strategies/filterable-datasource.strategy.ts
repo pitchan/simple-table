@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatPaginator, PageEvent } from '@angular/material/paginator';
 import { MatSort, Sort } from '@angular/material/sort';
 import { Observable, distinctUntilChanged, tap } from 'rxjs';
+import orderBy from 'lodash/orderBy';
 import { FilterableDataSource } from 'src/app/core/data-sources/common-data-sources/filterable-data-source';
 import { ITableStrategy } from '../models/table-strategy.interface';
 
@@ -173,5 +174,112 @@ export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
     if (this.dataSource && this.dataSource.loadPage) {
       this.dataSource.loadPage();
     }
+  }
+
+  /**
+   * Get current sort state
+   * This method is called by SimpleTableV2 to determine the current sort
+   */
+  getSort(): { active: string | null; direction: 'asc' | 'desc' } {
+    if (!this.sortInstance) {
+      return { active: null, direction: 'asc' };
+    }
+    return {
+      active: this.sortInstance.active || null,
+      direction: this.sortInstance.direction || 'asc'
+    };
+  }
+
+  /**
+   * Apply sort client-side (like TableTreeViewComponent.columnSorting)
+   * Does NOT trigger server reload - sorts data already in memory
+   * This preserves the behavior of the old TableTreeViewComponent
+   * 
+   * @param active - Column ID to sort by
+   * @param direction - Sort direction ('asc' or 'desc')
+   */
+  setSort(active: string | null, direction: 'asc' | 'desc'): void {
+    if (!this.sortInstance || !this.dataSource) {
+      console.warn('[FilterableDataSourceStrategy] Cannot sort - sortInstance or dataSource not available');
+      return;
+    }
+
+    // Update MatSort state for UI (arrows in headers)
+    this.sortInstance.active = active || '';
+    this.sortInstance.direction = direction;
+    
+    // Notify MatSort of state change to update UI
+    this.sortInstance._stateChanges.next();
+
+    // CLIENT-SIDE SORT: Sort data in memory without server reload
+    // This replicates TableTreeViewComponent.columnSorting() behavior
+    const currentData = this._data();
+    
+    if (!currentData || currentData.length === 0) {
+      console.debug('[FilterableDataSourceStrategy] No data to sort');
+      return;
+    }
+
+    // Sort using lodash orderBy (same as TableTreeViewComponent)
+    const sortedData = orderBy(
+      currentData,
+      [(item) => this.getSortValue(item, active)],
+      [direction]
+    );
+
+    // Update signal with sorted data
+    this._data.set(sortedData);
+    this.cdr.markForCheck();
+
+    console.debug(`[FilterableDataSourceStrategy] Client-side sort applied: ${active} ${direction}`);
+  }
+
+  /**
+   * Extract sort value from item (replicates TableTreeViewComponent.sortItemByStringAndArray)
+   * Handles strings, arrays, objects, dates, etc.
+   * 
+   * @param item - Data row
+   * @param columnName - Column to extract value from
+   * @returns Normalized value for sorting
+   */
+  private getSortValue(item: any, columnName: string | null): any {
+    if (!columnName || !item) {
+      return '';
+    }
+
+    const value = item[columnName];
+
+    // Handle undefined/null
+    if (value === undefined || value === null) {
+      return '';
+    }
+
+    // Handle strings: lowercase and trim for case-insensitive sort
+    if (typeof value === 'string') {
+      return value.trim().toLowerCase();
+    }
+
+    // Handle arrays or objects (e.g., multi-select chips)
+    if (typeof value === 'object' || Array.isArray(value)) {
+      if (Array.isArray(value)) {
+        return value.map((item) => {
+          if (typeof item === 'object' && item !== null) {
+            // Extract 'code' property if available (common pattern)
+            return item.code?.toString() || item.toString();
+          }
+          return item?.toString() || '';
+        });
+      }
+      // Single object: try to extract code or convert to string
+      return value.code?.toString() || value.toString();
+    }
+
+    // Handle dates (already sorted correctly by orderBy)
+    if (value instanceof Date) {
+      return value;
+    }
+
+    // Fallback: return as-is (numbers, booleans, etc.)
+    return value;
   }
 }
