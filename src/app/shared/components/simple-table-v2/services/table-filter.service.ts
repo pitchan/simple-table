@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { FilterList, FilterEvent } from '../../table-column-custom-filter/table-column-custom-filter.component';
+import { FilterList, FilterEvent } from '../models/filter.model';
 import { TableColumnDef } from '../models/column-def.model';
 
 /**

@@ -2,7 +2,7 @@ import { DragDropModule } from "@angular/cdk/drag-drop";
 import { ComponentFixture, TestBed, waitForAsync } from "@angular/core/testing";
 import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { TranslateModule } from "@ngx-translate/core";
-import { TreeTableColumn, TreeTableColumnDefaultConfig, TreeTableConfig } from "../table-tree-view/table-config";
+import { TreeTableColumn, TreeTableColumnDefaultConfig, TreeTableConfig } from "../../../table-tree-view/table-config";
 import { TableConfigEditorComponent } from "./table-config-editor.component";
 
 describe("TableConfigEditorComponent", () => {

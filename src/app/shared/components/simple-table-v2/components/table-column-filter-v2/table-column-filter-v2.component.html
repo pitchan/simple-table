@@ -1,0 +1,147 @@
+<div class="table-column-filter-v2" (click)="$event.stopPropagation()">
+  <!-- Search Filter -->
+  <div class="filter-search">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-icon matPrefix>search</mat-icon>
+      <input
+        matInput
+        [formControl]="customFilter.get('searchFilter')"
+        placeholder="Search..."
+        (keyup.enter)="onEnterChange()"
+      />
+    </mat-form-field>
+  </div>
+
+  <!-- Select All Checkbox -->
+  <div class="filter-select-all">
+    <mat-checkbox
+      [checked]="isAllSelected()"
+      [indeterminate]="hasSomeChecked()"
+      (change)="selectAll($event)"
+      color="primary"
+    >
+      Select All
+    </mat-checkbox>
+  </div>
+
+  <!-- Filter List -->
+  <div class="filter-list">
+    <mat-checkbox
+      *ngFor="let item of filterList(); let i = index; trackBy: trackItem"
+      [hidden]="item.hidden"
+      [checked]="item.checked"
+      (change)="checkboxChanged($event, i)"
+      color="primary"
+      class="filter-item"
+    >
+      {{ item.displayValue || '-' }}
+    </mat-checkbox>
+
+    <div *ngIf="visibleFilterItems().length === 0" class="no-results">
+      No results found
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="filter-actions">
+    <button mat-button (click)="viewAdvanceFilter()" type="button">
+      <mat-icon>{{ isAdvanceFilterOpen() ? 'expand_less' : 'tune' }}</mat-icon>
+      Advanced Filters
+    </button>
+    <button mat-button (click)="reset()" type="button" color="warn">
+      <mat-icon>clear</mat-icon>
+      Reset
+    </button>
+  </div>
+
+  <!-- Advanced Filter Panel -->
+  <div *ngIf="isAdvanceFilterOpen()" class="advanced-filter-panel">
+    <form [formGroup]="customFilter" (click)="$event.stopPropagation()">
+      <!-- Operator Type (AND/OR) -->
+      <mat-radio-group formControlName="operatorType" class="operator-group">
+        <mat-radio-button value="OR" color="primary">OR</mat-radio-button>
+        <mat-radio-button value="AND" color="primary">AND</mat-radio-button>
+      </mat-radio-group>
+
+      <!-- Filter 1 -->
+      <div formGroupName="advanceFilterType1" class="filter-row">
+        <mat-form-field appearance="outline" class="operator-field">
+          <mat-select formControlName="operatorType1" (selectionChange)="operatorTypeChange()">
+            <mat-option *ngFor="let op of filteredOperatorList" [value]="op.value">
+              {{ op.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field 
+          *ngIf="isColumnDataType !== 'date'" 
+          appearance="outline" 
+          class="input-field"
+        >
+          <input
+            matInput
+            formControlName="searchInput1"
+            placeholder="Value..."
+            (keyup)="operatorTypeChange($event)"
+          />
+        </mat-form-field>
+
+        <mat-form-field 
+          *ngIf="isColumnDataType === 'date'" 
+          appearance="outline" 
+          class="input-field"
+        >
+          <input
+            matInput
+            [matDatepicker]="picker1"
+            formControlName="searchInput1"
+            (dateChange)="operatorTypeChange()"
+            placeholder="Select date"
+          />
+          <mat-datepicker-toggle matSuffix [for]="picker1"></mat-datepicker-toggle>
+          <mat-datepicker #picker1></mat-datepicker>
+        </mat-form-field>
+      </div>
+
+      <!-- Filter 2 -->
+      <div formGroupName="advanceFilterType2" class="filter-row">
+        <mat-form-field appearance="outline" class="operator-field">
+          <mat-select formControlName="operatorType2" (selectionChange)="operatorTypeChange()">
+            <mat-option *ngFor="let op of filteredOperatorList" [value]="op.value">
+              {{ op.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field 
+          *ngIf="isColumnDataType !== 'date'" 
+          appearance="outline" 
+          class="input-field"
+        >
+          <input
+            matInput
+            formControlName="searchInput2"
+            placeholder="Value..."
+            (keyup)="operatorTypeChange($event)"
+          />
+        </mat-form-field>
+
+        <mat-form-field 
+          *ngIf="isColumnDataType === 'date'" 
+          appearance="outline" 
+          class="input-field"
+        >
+          <input
+            matInput
+            [matDatepicker]="picker2"
+            formControlName="searchInput2"
+            (dateChange)="operatorTypeChange()"
+            placeholder="Select date"
+          />
+          <mat-datepicker-toggle matSuffix [for]="picker2"></mat-datepicker-toggle>
+          <mat-datepicker #picker2></mat-datepicker>
+        </mat-form-field>
+      </div>
+    </form>
+  </div>
+</div>

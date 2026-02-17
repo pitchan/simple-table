@@ -42,10 +42,11 @@ import { TableColumnDef, TableConfig, TableState, DEFAULT_COLUMN_WIDTHS, ColumnR
 import { ResizableColumnDirective, ResizableColumnEvent } from './directives/resizable-column.directive';
 import { TableResizeService } from './services/table-resize.service';
 import { DomHandler } from './helpers/dom-handler';
-import { TableConfigEditorComponentV2 } from '../table-config-editor-v2/table-config-editor.component';
-import { TableColumnCustomFilterComponent, FilterList, FilterEvent } from '../table-column-custom-filter/table-column-custom-filter.component';
+import { TableConfigEditorComponentV2 } from './components/table-config-editor-v2/table-config-editor.component';
+import { TableColumnFilterV2Component } from './components/table-column-filter-v2/table-column-filter-v2.component';
+import { FilterList, FilterEvent } from './models/filter.model';
 import { TableFilterService } from './services/table-filter.service';
-import { DirectiveModule } from '../table-tree-view/directive/directive.module';
+import { PreventMenuCloseDirective } from './directives/prevent-menu-close.directive';
 
 /**
  * SimpleTableV2Component - Refactored with Strategy Pattern
@@ -94,9 +95,9 @@ import { DirectiveModule } from '../table-tree-view/directive/directive.module';
     TranslateModule,
     ResizableColumnDirective,
     TableConfigEditorComponentV2,
-    TableColumnCustomFilterComponent,
+    TableColumnFilterV2Component,
     ScrollingModule,
-    DirectiveModule
+    PreventMenuCloseDirective
   ],
   providers: [TableResizeService, TableFilterService],
 })

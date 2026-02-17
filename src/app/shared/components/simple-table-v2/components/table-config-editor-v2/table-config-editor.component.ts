@@ -9,7 +9,7 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { TranslateModule } from '@ngx-translate/core';
 
-import { ColumnResizeMode } from '../simple-table-v2/models/column-def.model';
+import { ColumnResizeMode } from '../../models/column-def.model';
 
 @Component({
   selector: 'app-table-config-editor-v2',

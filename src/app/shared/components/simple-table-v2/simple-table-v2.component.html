@@ -86,15 +86,14 @@
           </button>
           
           <mat-menu #columnFilter="matMenu" backdropClass="table-column-filter" (click)="$event.stopPropagation()">
-            <app-table-column-custom-filter
-              preventMenuClose
+            <app-table-column-filter-v2
+              appPreventMenuClose
               [columnName]="column.id"
-              [columnIsTree]="false"
               [filterListMap]="columnFilterListMap()"
               [filteredColumnList]="filteredColumnList"
               (filteredEvents)="handleFilterEvent($event, column.id)"
               (resetCustomFilterEvent)="handleResetFilter(column.id)"
-            ></app-table-column-custom-filter>
+            ></app-table-column-filter-v2>
           </mat-menu>
         </div>
       </div>
