@@ -1,0 +1,257 @@
+<div class="custom-filter-wrapper">
+  <mat-toolbar-row (click)="viewAdvanceFilter()">
+    <span>{{ columnName?.toLowerCase().includes('date') ? 'Date' : 'Text' }} Filter</span>
+    <span class="example-spacer"></span>
+    <button
+      class="advance-filter"
+      mat-menu-item
+      [matMenuTriggerFor]="advanceFilter"
+      (click)="viewAdvanceFilter()"
+      #menuTrigger="matMenuTrigger"
+      preventMenuClose
+    >
+      <mat-icon>{{ isAdvanceFilterOpen ? 'keyboard_arrow_right' : 'keyboard_arrow_down' }}</mat-icon>
+    </button>
+  </mat-toolbar-row>
+  <form [formGroup]="customFilter">
+    <section class="filter">
+      <div class="checkbox-container">
+        <mat-form-field appearance="outline" class="searchFilter">
+          <mat-label>Search</mat-label>
+          <input matInput type="text" (keyup.enter)="onEnterChange()" formControlName="searchFilter" />
+        </mat-form-field>
+        <div class="checkbox-list-wrapper">
+          <!-- is columnIsTree value -->
+          <div *ngIf="columnIsTree">
+            <mat-checkbox (change)="selectAll($event)" [color]="'primary'" [checked]="checkIfIsAllSelected()">
+              Select All
+            </mat-checkbox>
+            <!-- dataSource  has  to be changed with dataSourceCustomTreeData -->
+
+            <cdk-virtual-scroll-viewport
+              #viewPort1
+              tvsItemSize="48"
+              [flexibleTvsItemSize]="false"
+              bufferMultiplier="10"
+              [disableVirtualScroll]="true"
+              [readjustTotalContentSize]="readjustTotalContentSize"
+              class="viewport-custom-filter"
+              disabledHiddenFliter="true"
+              [forCustomFilter]="true"
+            >
+              <mat-tree [dataSource]="dataSource" [treeControl]="treeControlCustomFilter">
+                <mat-tree-node
+                  *matTreeNodeDef="let node"
+                  matTreeNodePadding
+                  [style.display]="isNodeVisible(node) ? '' : 'none'"
+                  [ngClass]="{ 'pld-code': node.pldCode, 'ev-code': node.evCcDcCode }"
+                >
+                  <ng-container *ngIf="!(node.hidden && node.filteredBy != columnName)">
+                    <!--=> Dispaly only visible element and those who are hidden by the current tree column -->
+                    <mat-checkbox
+                      class="checklist-leaf-node"
+                      [checked]="checklistSelection.isSelected(node)"
+                      (change)="toggleSelection(node)"
+                      [color]="'primary'"
+                      >{{
+                        node?.evCcDcCode
+                          ? node?.evCcDcCode
+                          : node?.pldCode
+                          ? node?.pldCode
+                          : node?.category
+                          ? node?.category
+                          : node?.modelGridDescription
+                      }}
+                    </mat-checkbox>
+                  </ng-container>
+                </mat-tree-node>
+
+                <mat-tree-node
+                  *matTreeNodeDef="let node; when: hasChild"
+                  matTreeNodePadding
+                  [style.display]="isNodeVisible(node) ? '' : 'none'"
+                >
+                  <ng-container *ngIf="!(node.hidden && node.filteredBy != columnName)">
+                    <!--=> Dispaly only visible element and those who are hidden by the current tree column -->
+                    <button
+                      mat-icon-button
+                      matTreeNodeToggle
+                      [matTreeNodeToggleRecursive]="true"
+                      [attr.aria-label]="'toggle ' + node.filename"
+                      (click)="onNodeToggle(node)"
+                    >
+                      <mat-icon class="mat-icon-rtl-mirror">
+                        {{ !treeControlCustomFilter.isExpanded(node) ? 'chevron_right' : 'expand_more' }}
+                      </mat-icon>
+                    </button>
+                    <!--Don't add onclick callback function for this button , otherwise tree node collapse won't work-->
+
+                    <mat-checkbox
+                      [checked]="descendantsAllSelected(node)"
+                      [indeterminate]="descendantsPartiallySelected(node)"
+                      (change)="toggleSelection(node)"
+                      [color]="'primary'"
+                      >{{
+                        node?.evCcDcCode
+                          ? node?.evCcDcCode
+                          : node?.pldCode
+                          ? node?.pldCode
+                          : node?.category
+                          ? node?.category
+                          : node?.modelGridDescription
+                      }}</mat-checkbox
+                    >
+                    <!--=> Dispaly only visible element and those who are hidden by the current tree column -->
+                  </ng-container>
+                </mat-tree-node>
+              </mat-tree>
+            </cdk-virtual-scroll-viewport>
+          </div>
+          <!-- is columnIsTree value end -->
+
+          <!-- for normal filters -->
+          <ng-container *ngIf="!columnIsTree">
+            <mat-checkbox (change)="selectAll($event)" [color]="'primary'" [checked]="checkIfIsAllSelected()">
+              Select All
+            </mat-checkbox>
+            <div *ngFor="let item of filterList; let i = index; trackBy: trackItem">
+              <mat-checkbox
+                (change)="checkboxChanged($event, i, true)"
+                [color]="'primary'"
+                [checked]="item.checked"
+                [hidden]="item.hidden"
+              >
+                {{
+                  item.isColumnDateType
+                    ? item.value == null || item.value == undefined
+                      ? '(Empty)'
+                      : (item.value | localizedDate)
+                    : item.displayValue
+                    ? item.displayValue
+                    : '(Empty)'
+                }}
+              </mat-checkbox>
+            </div>
+          </ng-container>
+
+          <!-- for normal filters end -->
+        </div>
+      </div>
+      <div class="clearfix button-wrapper">
+        <div class="float-end">
+          <button
+            [ngClass]="themeService.getStoredTheme().key.includes('stellar') ? 'reset-btn' : 'btn-stellantis'"
+            mat-button
+            mat-stroked-button
+            type="button"
+            (click)="reset(); isModelGridTable ? resetCustomTreeFilter() : null;"
+          >
+            RESET
+          </button>
+        </div>
+      </div>
+    </section>
+    <section>
+      <mat-menu #advanceFilter="matMenu" backdropClass="table-column-filter">
+        <div class="advance-filter" preventMenuClose>
+          <div class="custom-advance-type" formGroupName="advanceFilterType1">
+            <div class="form-control">
+              <mat-form-field appearance="outline">
+                <mat-label>Operator</mat-label>
+                <mat-select
+                  formControlName="operatorType1"
+                  class="text-uppercase"
+                  (selectionChange)="operatorTypeChange()"
+                >
+                  <mat-option *ngFor="let item of filteredOperatorList" [value]="item.value">
+                    <span class="text-uppercase">{{ item.label }}</span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="form-control">
+              <ng-contianer *ngIf="isColumnDataType == 'date'">
+                <mat-form-field appearance="outline" class="date-filter-field">
+                  <mat-label>Search</mat-label>
+                  <input
+                    matInput
+                    [matDatepicker]="multi1"
+                    formControlName="searchInput1"
+                    (dateChange)="operatorTypeChange()"
+                  />
+                  <mat-datepicker-toggle [for]="multi1"></mat-datepicker-toggle>
+                  <mat-datepicker #multi1></mat-datepicker>
+                </mat-form-field>
+              </ng-contianer>
+              <ng-container *ngIf="isColumnDataType !== 'date'">
+                <mat-form-field appearance="outline">
+                  <mat-label>Search</mat-label>
+                  <input
+                    matInput
+                    placeholder=""
+                    formControlName="searchInput1"
+                    (keyup.enter)="operatorTypeChange($event)"
+                  />
+                  <button mat-icon-button class="search-button" (click)="operatorTypeChange($event)">
+                    <mat-icon>search</mat-icon>
+                  </button>
+                </mat-form-field>
+              </ng-container>
+            </div>
+          </div>
+          <div class="operator-type">
+            <mat-radio-group formControlName="operatorType" [color]="'primary'" (change)="operatorTypeChange()">
+              <mat-radio-button value="AND">AND</mat-radio-button>
+              <mat-radio-button value="OR">OR</mat-radio-button>
+            </mat-radio-group>
+          </div>
+          <div class="custom-advance-type" formGroupName="advanceFilterType2">
+            <div class="form-control">
+              <mat-form-field appearance="outline" class="">
+                <mat-label>Operator</mat-label>
+                <mat-select
+                  formControlName="operatorType2"
+                  class="text-uppercase"
+                  (selectionChange)="operatorTypeChange()"
+                >
+                  <mat-option *ngFor="let item of filteredOperatorList" [value]="item.value">
+                    <span class="text-uppercase">{{ item.label }}</span>
+                  </mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="form-control">
+              <ng-container *ngIf="isColumnDataType == 'date'">
+                <mat-form-field appearance="outline" class="date-filter-field">
+                  <mat-label>Search</mat-label>
+                  <input
+                    matInput
+                    [matDatepicker]="multi2"
+                    formControlName="searchInput2"
+                    (dateChange)="operatorTypeChange()"
+                  />
+                  <mat-datepicker-toggle [for]="multi2"></mat-datepicker-toggle>
+                  <mat-datepicker #multi2></mat-datepicker>
+                </mat-form-field>
+              </ng-container>
+              <ng-container *ngIf="isColumnDataType !== 'date'">
+                <mat-form-field class="feature-description-field" appearance="outline">
+                  <mat-label>Search</mat-label>
+                  <input
+                    matInput
+                    placeholder=""
+                    formControlName="searchInput2"
+                    (keyup.enter)="operatorTypeChange($event)"
+                  />
+                  <button mat-icon-button class="search-button" (click)="operatorTypeChange($event)">
+                    <mat-icon>search</mat-icon>
+                  </button>
+                </mat-form-field>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+      </mat-menu>
+    </section>
+  </form>
+</div>

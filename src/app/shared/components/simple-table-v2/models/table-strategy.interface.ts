@@ -81,6 +81,12 @@ export interface ITableStrategy<T> {
    * Optional: Get current sort state (for virtual scroll header UI)
    */
   getSort?(): { active: string | null; direction: 'asc' | 'desc' };
+
+  /**
+   * Optional: Set filtered data directly (for custom column filters)
+   * Bypasses internal filter pipeline
+   */
+  setFilteredData?(filteredData: T[]): void;
 }
 
 /**

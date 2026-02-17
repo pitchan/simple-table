@@ -73,6 +73,29 @@
                     class="sort-icon">
             {{ getSortState(column.id).direction === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
           </mat-icon>
+          
+          <!-- Filter button -->
+          <button *ngIf="column.filterable !== false"
+                  class="filter-button" 
+                  mat-icon-button
+                  [matMenuTriggerFor]="columnFilter"
+                  (click)="$event.stopPropagation(); onFilterButtonClick(column.id)"
+                  [matTooltip]="'COMMON.BUTTON_FILTER' | translate"
+                  matTooltipPosition="above">
+            <mat-icon [ngClass]="{'view-icon': filteredColumns[column.id]}">filter_list</mat-icon>
+          </button>
+          
+          <mat-menu #columnFilter="matMenu" backdropClass="table-column-filter" (click)="$event.stopPropagation()">
+            <app-table-column-custom-filter
+              preventMenuClose
+              [columnName]="column.id"
+              [columnIsTree]="false"
+              [filterListMap]="columnFilterListMap()"
+              [filteredColumnList]="filteredColumnList"
+              (filteredEvents)="handleFilterEvent($event, column.id)"
+              (resetCustomFilterEvent)="handleResetFilter(column.id)"
+            ></app-table-column-custom-filter>
+          </mat-menu>
         </div>
       </div>
 

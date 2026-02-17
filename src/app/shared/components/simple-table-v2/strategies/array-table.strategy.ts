@@ -139,6 +139,17 @@ export class ArrayTableStrategy<T> implements ITableStrategy<T> {
     this.cdr.markForCheck();
   }
 
+  /**
+   * Set filtered data directly (used by custom column filters)
+   * Bypasses the internal filter pipeline
+   */
+  setFilteredData(filteredData: T[]): void {
+    this.rowsSig.set(filteredData);
+    // Reset to first page when data changes
+    this.setPage(0, this.pageSig().size);
+    this.cdr.markForCheck();
+  }
+
   private applyFilters(rows: T[], filtersState: Record<string, ColumnFilterState>): T[] {
     if (this.config?.filterApply) {
       return this.config.filterApply(rows, filtersState);

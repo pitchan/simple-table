@@ -223,7 +223,7 @@ export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
     // Sort using lodash orderBy (same as TableTreeViewComponent)
     const sortedData = orderBy(
       currentData,
-      [(item: any) => this.getSortValue(item, active)],
+      [(item) => this.getSortValue(item, active)],
       [direction]
     );
 
@@ -232,6 +232,22 @@ export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
     this.cdr.markForCheck();
 
     console.debug(`[FilterableDataSourceStrategy] Client-side sort applied: ${active} ${direction}`);
+  }
+
+  /**
+   * Set filtered data directly (used by custom column filters)
+   * For client-side filtering on already-loaded data
+   */
+  setFilteredData(filteredData: T[]): void {
+    this._data.set(filteredData);
+    this._totalCount.set(filteredData.length);
+    
+    // Reset paginator to first page when filter changes
+    if (this.paginatorInstance) {
+      this.paginatorInstance.firstPage();
+    }
+    
+    this.cdr.markForCheck();
   }
 
   /**

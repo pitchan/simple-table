@@ -1,0 +1,179 @@
+@use "sass:map";
+@use "@angular/material" as mat;
+
+/*mixin name will be used in main style.scss*/
+@mixin theme($theme) {
+    /* retrieve variables from theme */
+    /* (all possible variables, use only what you really need)*/
+    $primary: map.get($theme, primary);
+    $background: map.get($theme, background);
+    $secondary: map.get($theme, accent);
+    $foreground: map.get($theme, foreground);
+
+    .custom-filter-wrapper {
+        .mat-mdc-text-field-wrapper {
+            background-color: transparent !important;
+        }
+
+        .filter {
+            .checkbox-container {
+                .checkbox-list-wrapper .mat-mdc-checkbox .mdc-form-field {
+                    --mdc-theme-text-primary-on-background: map.get($background, background) !important;
+
+                }
+
+                mat-form-field .mat-mdc-text-field-wrapper {
+                    --mdc-outlined-text-field-outline-color: map.get($background, background) !important;
+                    --mdc-outlined-text-field-focus-outline-color: map.get($background, background) !important;
+                    --mdc-outlined-text-field-hover-outline-color: map.get($background, background) !important;
+                    --mdc-outlined-text-field-label-text-color: map.get($background, background) !important;
+                }
+            }
+
+            .mat-toolbar-row {
+
+                .mat-mdc-menu-item .mat-icon-no-color,
+                .mat-mdc-menu-item .mat-mdc-menu-submenu-icon {
+                    --mat-menu-item-icon-color: #1F1E1E !important;
+                }
+            }
+
+        }
+
+        color:map.get($background, default-contrast);
+        background-color: var(--mat-sidenav-container-background-color) !important;
+
+        .searchFilter {
+            color: map.get($background, default-contrast) !important;
+        }
+
+        .dark-theme .reset-btn {
+            background-color: red !important;
+        }
+
+        .button-wrapper {
+            background-color: var(--mat-sidenav-container-background-color) !important;
+        }
+
+        .btn-stellantis {
+            border: 1px solid mat.get-color-from-palette($primary);
+            background-color: mat.get-color-from-palette($primary);
+            color: #fff;
+        }
+
+        .mdc-text-field--outlined:not(.mdc-text-field--disabled) .mdc-text-field__input {
+            caret-color: map.get($background, default-contrast) !important;
+        }
+
+        .search-button {
+            color: map.get($background, default-contrast) !important;
+        }
+
+        .reset-btn {
+            background-color: mat.get-color-from-palette($primary);
+            color: map.get($background, default-contrast) !important;
+        }
+
+        .mdc-floating-label {
+            color: map.get($background, default-contrast) !important;
+        }
+
+
+        .mat-tree-node {
+            .mdc-label {
+                width: max-content;
+            }
+
+        }
+    }
+
+
+    .advance-filter {
+        .mdc-notched-outline {
+            --mdc-outlined-text-field-label-text-color: map.get($background, background) !important;
+            --mdc-outlined-text-field-outline-color: map.get($background, background) !important;
+        }
+
+        .mat-mdc-radio-button .mdc-radio .mdc-radio__native-control:enabled:not(:checked)+.mdc-radio__background .mdc-radio__outer-circle {
+            --mdc-radio-unselected-icon-color: map.get($background, background) !important;
+        }
+
+        .operator-type mat-radio-group .mdc-form-field .mdc-radio .mdc-radio__background .mdc-radio__outer-circle {
+            --mdc-radio-unselected-hover-icon-color: map.get($background, background) !important;
+        }
+
+        --mat-select-enabled-arrow-color: map.get($background, background) !important;
+        --mat-select-enabled-trigger-text-color: map.get($background, background) !important;
+        --mdc-outlined-text-field-hover-outline-color: map.get($background, background) !important;
+        --mdc-theme-text-primary-on-background: map.get($background, background) !important;
+        --mdc-radio-unselected-icon-color: map.get($background, background) !important;
+        --mat-menu-item-focus-state-layer-color: map.get($background, background) !important;
+
+
+        mat-icon {
+            color: map.get($background, default-contrast);
+        }
+
+        .mat-mdc-form-field-infix {
+            color: map.get($background, default-contrast) !important;
+        }
+
+        --mdc-outlined-text-field-hover-outline-color: map.get($background, default-contrast) !important;
+
+        .mat-mdc-text-field-wrapper .mdc-text-field--focused {
+            --mdc-outlined-text-field-focus-outline-color: map.get($background, background) !important;
+        }
+
+        .custom-advance-type {
+            color: map.get($background, default-contrast);
+            background-color: var(--mat-sidenav-container-background-color) !important;
+        }
+
+        .operator-type {
+            background-color: var(--mat-sidenav-container-background-color) !important;
+        }
+
+        .form-control {
+            background-color: var(--mat-sidenav-container-background-color) !important;
+        }
+
+        background-color: var(--mat-sidenav-container-background-color) !important;
+
+        mat-form-field .mat-mdc-text-field-wrapper {
+            .mdc-notched-outline {
+                border-color: map.get($background, default-contrast) !important;
+            }
+        }
+
+        .mat-mdc-radio-group {
+            color: map.get($background, default-contrast) !important;
+        }
+
+        .mdc-floating-label {
+            color: map.get($background, default-contrast) !important;
+        }
+
+        .mdc-text-field--outlined:not(.mdc-text-field--disabled) .mdc-text-field__input {
+            caret-color: map.get($background, default-contrast) !important;
+        }
+
+        .mdc-notched-outline>* {
+            border-color: map.get($background, default-contrast) !important;
+            color: map.get($background, default-contrast) !important;
+        }
+
+        .mat-mdc-form-field.mat-focused .mat-mdc-select-arrow {
+            color: map.get($background, default-contrast) !important;
+        }
+
+    }
+
+    .mat-mdc-text-field-wrapper.mdc-text-field--outlined .mat-mdc-form-field-infix {
+        color: map.get($background, default-contrast) !important;
+    }
+
+    .mat-pseudo-checkbox-minimal.mat-pseudo-checkbox-checked::after {
+        color: map.get($background, default-contrast) !important;
+    }
+
+}

@@ -166,11 +166,15 @@ $resize-helper-color: #2196f3;
   white-space: nowrap;
   padding: 0 16px;
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 
   .header-label {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex-shrink: 1;
   }
 
   &.grid-header-cell--select,
@@ -187,9 +191,6 @@ $resize-helper-color: #2196f3;
   &.sortable {
     cursor: pointer;
     user-select: none;
-    display: flex;
-    align-items: center;
-    gap: 4px;
 
     &:hover {
       background-color: rgba(0, 0, 0, 0.04);
@@ -207,6 +208,43 @@ $resize-helper-color: #2196f3;
     line-height: 18px;
     opacity: 0.7;
     flex-shrink: 0;
+  }
+
+  // Filter button styles (matching TableTreeView)
+  .filter-button {
+    margin-left: auto;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    padding: 0;
+    min-width: 24px;
+    flex-shrink: 0;
+
+    .mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
+      opacity: 0.6;
+
+      &.view-icon {
+        color: var(--primary-color, #1976d2);
+        opacity: 1;
+      }
+    }
+
+    &:hover .mat-icon {
+      opacity: 0.9;
+    }
+  }
+}
+
+// Filter menu backdrop (matching TableTreeView)
+::ng-deep .table-column-filter {
+  max-width: none !important;
+  
+  .mat-mdc-menu-content {
+    padding: 0;
   }
 }
 

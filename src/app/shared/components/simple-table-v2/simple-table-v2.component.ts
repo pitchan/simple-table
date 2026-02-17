@@ -21,6 +21,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { tap } from 'rxjs';
 import { CommonModule, JsonPipe } from '@angular/common';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -42,6 +43,9 @@ import { ResizableColumnDirective, ResizableColumnEvent } from './directives/res
 import { TableResizeService } from './services/table-resize.service';
 import { DomHandler } from './helpers/dom-handler';
 import { TableConfigEditorComponentV2 } from '../table-config-editor-v2/table-config-editor.component';
+import { TableColumnCustomFilterComponent, FilterList, FilterEvent } from '../table-column-custom-filter/table-column-custom-filter.component';
+import { TableFilterService } from './services/table-filter.service';
+import { DirectiveModule } from '../table-tree-view/directive/directive.module';
 
 /**
  * SimpleTableV2Component - Refactored with Strategy Pattern
@@ -90,9 +94,11 @@ import { TableConfigEditorComponentV2 } from '../table-config-editor-v2/table-co
     TranslateModule,
     ResizableColumnDirective,
     TableConfigEditorComponentV2,
-    ScrollingModule
+    TableColumnCustomFilterComponent,
+    ScrollingModule,
+    DirectiveModule
   ],
-  providers: [TableResizeService],
+  providers: [TableResizeService, TableFilterService],
 })
 export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
@@ -100,6 +106,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   private readonly elementRef = inject(ElementRef);
   private readonly renderer = inject(Renderer2);
   private readonly resizeService = inject(TableResizeService);
+  private readonly filterService = inject(TableFilterService<T>);
 
   /** Flag to track if AfterViewInit has been called */
   private viewInitialized = false;
@@ -229,6 +236,18 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
   // ========== CONFIG EDITOR STATE ==========
   editorOptions: any = { columns: { columns: [], groups: [] } };
+
+  // ========== FILTER STATE ==========
+  /** Map of filter lists per column (for TableColumnCustomFilterComponent) */
+  columnFilterListMap = signal<Map<string, Array<FilterList>>>(new Map());
+  /** Active filters per column */
+  filteredColumnList: Array<FilterEvent> = [];
+  /** Highlighted filter icons per column */
+  filteredColumns: Record<string, boolean> = {};
+  /** Original unfiltered data (cloned before any filtering) */
+  cloneTableData: T[] = [];
+  /** Trigger for filter list map changes (incremental signal update) */
+  private readonly columnFilterListMapTrigger = signal(0);
 
   // ========== LIFECYCLE ==========
   ngOnInit(): void {
@@ -581,9 +600,31 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   private connectStrategy(): void {
     if (this.strategy.connect) {
       this.strategy.connect().pipe(
-        takeUntilDestroyed(this.destroyRef)
+        takeUntilDestroyed(this.destroyRef),
+        tap(() => {
+          // Save original data for filtering when data arrives and no filters are active
+          const currentData = this.tableData();
+          if (currentData && currentData.length > 0 && this.filteredColumnList.length === 0) {
+            this.cloneTableData = [...currentData];
+            if (this.debug) {
+              console.log('[SimpleTableV2] Saved original data for filtering:', this.cloneTableData.length, 'rows');
+            }
+          }
+        })
       ).subscribe();
+    } else {
+      // For strategies without connect (like ArrayTableStrategy), save data immediately
+      setTimeout(() => {
+        const currentData = this.tableData();
+        if (currentData && currentData.length > 0 && this.filteredColumnList.length === 0) {
+          this.cloneTableData = [...currentData];
+          if (this.debug) {
+            console.log('[SimpleTableV2] Saved original data for filtering:', this.cloneTableData.length, 'rows');
+          }
+        }
+      });
     }
+
     if (this.debug) {
       console.log('[SimpleTableV2] Strategy connected');
     }
@@ -610,6 +651,136 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     event.stopPropagation();
     this.hyperlinkClick.emit({ row, column: columnId });
   }
+
+  // ========== FILTER HANDLERS ==========
+  
+  /**
+   * Handle filter button click - build filterListMap for the column
+   */
+  onFilterButtonClick(columnId: string): void {
+    this.viewFilter(columnId, false);
+    this.columnFilterListMapTrigger.update(v => v + 1);
+  }
+
+  /**
+   * Build filter list for a specific column (unique values from ORIGINAL data)
+   * IMPORTANT: Always uses cloneTableData to keep all values visible even when unchecked
+   * Adapted from TableTreeView.viewFilter()
+   */
+  private viewFilter(columnId: string, isReset = false): Array<FilterList> {
+    const column = this.getColumn(columnId);
+    if (!column) return [];
+
+    // CRITICAL FIX: Always use cloneTableData (original unfiltered data)
+    // NOT tableData() which is already filtered - this would hide unchecked items!
+    const originalData = this.cloneTableData;
+    if (!originalData || originalData.length === 0) {
+      console.warn('[SimpleTableV2] No original data for filtering, using current data');
+      return [];
+    }
+
+    // Find existing filter state to preserve checkbox values
+    const existingFilterEvent = this.filteredColumnList.find(f => f.columnName === columnId);
+
+    // Delegate to service (SOLID principle)
+    const filterList = this.filterService.buildFilterList(
+      columnId,
+      column,
+      originalData,
+      (row, col) => this.getCellValue(row, col),
+      (value, col) => this.filterService.formatDisplayValue(value, col),
+      existingFilterEvent
+    );
+    
+    // Update the map with new Map instance to trigger change detection
+    const newMap = new Map(this.columnFilterListMap());
+    newMap.set(columnId, filterList);
+    this.columnFilterListMap.set(newMap);
+
+    return filterList;
+  }
+
+
+
+  /**
+   * Handle filter events from TableColumnCustomFilterComponent
+   * Adapted from TableTreeView.filterTableByEvents()
+   */
+  handleFilterEvent(event: FilterEvent, columnId: string): void {
+    if (this.debug) {
+      console.log('[SimpleTableV2] Filter event:', event, 'for column:', columnId);
+    }
+
+    // Handle reset
+    if (event.reset) {
+      this.handleResetFilter(columnId);
+      return;
+    }
+
+    // Update filteredColumnList
+    const existingIndex = this.filteredColumnList.findIndex(f => f.columnName === columnId);
+    if (existingIndex >= 0) {
+      this.filteredColumnList[existingIndex] = event;
+    } else {
+      this.filteredColumnList.push(event);
+    }
+
+    // Mark column as filtered
+    this.filteredColumns[columnId] = true;
+
+    // Apply all filters
+    this.applyAllFilters();
+    
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Reset filter for a specific column
+   */
+  handleResetFilter(columnId: string): void {
+    // Remove from filteredColumnList
+    this.filteredColumnList = this.filteredColumnList.filter(
+      f => f.columnName !== columnId
+    );
+
+    // Remove highlight
+    delete this.filteredColumns[columnId];
+
+    // Reapply remaining filters
+    if (this.filteredColumnList.length === 0) {
+      // No more filters, restore original data
+      this.strategy.setFilteredData?.([...this.cloneTableData]);
+    } else {
+      this.applyAllFilters();
+    }
+
+    // Rebuild filterListMap for all columns (cross-column effect)
+    this.displayedColumns.forEach(colId => {
+      if (colId !== 'select') {
+        this.viewFilter(colId, false);
+      }
+    });
+
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Apply all active filters (AND logic between columns)
+   * Delegates to TableFilterService (SOLID principle)
+   */
+  private applyAllFilters(): void {
+    const filtered = this.filterService.applyAllFilters(
+      this.cloneTableData,
+      this.filteredColumnList,
+      (columnId) => this.getColumn(columnId),
+      (row, col) => this.getCellValue(row, col),
+      (value, col) => this.filterService.formatDisplayValue(value, col)
+    );
+
+    this.strategy.setFilteredData?.(filtered);
+  }
+
+
 
   // ========== SELECTION ==========
   isAllSelected(): boolean {
