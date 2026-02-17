@@ -29,18 +29,7 @@
     <mat-spinner diameter="50"></mat-spinner>
   </div>
 
-  <!-- Config toolbar: cog above table, right-aligned (avoids resize/layout issues) -->
-  <div class="table-toolbar" *ngIf="showConfigEditor">
-    <span class="spacer"></span>
-    <button
-      mat-icon-button
-      [matMenuTriggerFor]="configMenu"
-      matTooltip="Configure columns"
-      type="button"
-      aria-label="Configure columns">
-      <mat-icon>settings</mat-icon>
-    </button>
-  </div>
+  
 
   <!-- Single grid (div-based): one wrapper, one header, body with ngIf on virtual scroll only -->
   <div class="table-wrapper" 
@@ -184,5 +173,17 @@
       [showFirstLastButtons]="true"
       (page)="onPageChangeEvent($event)">
     </mat-paginator>
+
+    <!-- Config toolbar -->
+    <div class="table-config" *ngIf="showConfigEditor">
+      <button
+        mat-icon-button
+        [matMenuTriggerFor]="configMenu"
+        matTooltip="Configure columns"
+        type="button"
+        aria-label="Configure columns">
+        <mat-icon>settings</mat-icon>
+      </button>
+    </div>
   </div>
 </div>

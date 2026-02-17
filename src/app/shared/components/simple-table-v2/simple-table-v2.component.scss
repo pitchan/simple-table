@@ -49,20 +49,6 @@ $resize-helper-color: #2196f3;
   box-shadow: 0 0 4px rgba(33, 150, 243, 0.5);
 }
 
-.table-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 4px 8px;
-  background: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  min-height: 40px;
-  align-items: center;
-
-  .spacer {
-    flex: 1 1 auto;
-  }
-}
-
 .loading-overlay {
   position: absolute;
   top: 0;

@@ -90,7 +90,7 @@ import { TableConfigEditorComponentV2 } from '../table-config-editor-v2/table-co
     TranslateModule,
     ResizableColumnDirective,
     TableConfigEditorComponentV2,
-    ScrollingModule,
+    ScrollingModule
   ],
   providers: [TableResizeService],
 })
