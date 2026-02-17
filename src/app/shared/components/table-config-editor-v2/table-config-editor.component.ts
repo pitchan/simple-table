@@ -9,7 +9,7 @@ import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-
 import { TranslateModule } from '@ngx-translate/core';
 
 @Component({
-  selector: 'app-table-config-editor',
+  selector: 'app-table-config-editor-v2',
   templateUrl: './table-config-editor.component.html',
   styleUrls: ['./table-config-editor.component.scss'],
   standalone: true,
@@ -24,7 +24,7 @@ import { TranslateModule } from '@ngx-translate/core';
     TranslateModule
   ]
 })
-export class TableConfigEditorComponent {
+export class TableConfigEditorComponentV2 {
   @Input() options: any;
   @Input() tableColumnDefaultConfig: any;
   @Input() hasLockOption = false;

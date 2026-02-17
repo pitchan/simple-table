@@ -223,7 +223,7 @@ export class FilterableDataSourceStrategy<T> implements ITableStrategy<T> {
     // Sort using lodash orderBy (same as TableTreeViewComponent)
     const sortedData = orderBy(
       currentData,
-      [(item) => this.getSortValue(item, active)],
+      [(item: any) => this.getSortValue(item, active)],
       [direction]
     );
 
