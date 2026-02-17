@@ -1,22 +1,27 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { TranslateModule } from '@ngx-translate/core';
 
+import { ColumnResizeMode } from '../simple-table-v2/models/column-def.model';
+
 @Component({
   selector: 'app-table-config-editor-v2',
   templateUrl: './table-config-editor.component.html',
   styleUrls: ['./table-config-editor.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
   imports: [
     CommonModule,
     FormsModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatIconModule,
     MatSlideToggleModule,
     MatExpansionModule,
@@ -29,8 +34,11 @@ export class TableConfigEditorComponentV2 {
   @Input() tableColumnDefaultConfig: any;
   @Input() hasLockOption = false;
   @Input() hasResponsiveOption = false;
+  @Input() hasResizeOption = false;
+  @Input() columnResizeMode: ColumnResizeMode = 'fit';
   @Output() onTableColumnChangeEvent = new EventEmitter<any>();
   @Output() autoResizeChangeEvent = new EventEmitter<boolean>();
+  @Output() columnResizeModeChangeEvent = new EventEmitter<ColumnResizeMode>();
 
   // Constants for template
   readonly DISPLAY_MODE_SINGLE = 'single';
@@ -78,6 +86,12 @@ export class TableConfigEditorComponentV2 {
     event.stopPropagation();
     column.hidden = !column.hidden;
     this.emitChange();
+  }
+
+  onColumnResizeModeChange(value: ColumnResizeMode | undefined): void {
+    if (value === 'fit' || value === 'expand') {
+      this.columnResizeModeChangeEvent.emit(value);
+    }
   }
 
   private emitChange(): void {

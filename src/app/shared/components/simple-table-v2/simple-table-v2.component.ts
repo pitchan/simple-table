@@ -144,6 +144,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   /** Show column configuration editor (menu with column order, visibility, sticky). */
   @Input() showConfigEditor = false;
 
+  /** Item size in px for CDK virtual scroll (fixed height per row, V1). */
+  @Input() virtualScrollItemSize = 48;
+
   // ========== OUTPUTS ==========
   /** Row click event */
   @Output() rowClick = new EventEmitter<T>();
@@ -361,9 +364,57 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     this.cdr.markForCheck();
   }
 
-  handleAutoResize(event: boolean): void {
-    if (this.debug) console.log('Auto resize toggled', event);
-    // Not implemented yet
+  handleAutoResize(_event: boolean): void {
+    const key = this.getTableStateStorageKey();
+    if (!key) return;
+
+    // Lire l'état actuel (storage ou build depuis config)
+    const currentState = this.readTableStateFromStorage() ?? this.buildTableState();
+
+    // Ne modifier que columnWidths : le vider
+    const updatedState: TableState = {
+      ...currentState,
+      columnWidths: {}
+    };
+
+    // Sauvegarder (conserve order, hidden, sticky, etc.)
+    this.writeTableStateToStorage(updatedState);
+
+    // En mémoire : reset largeurs et repartir des défauts
+    this.columnWidths.clear();
+    this.applyColumnWidthsFromStateOrDefaults();
+
+    if (this.viewInitialized) {
+      this.applyInitialWidths();
+    }
+    this.cdr.markForCheck();
+  }
+
+  handleColumnResizeModeChange(mode: ColumnResizeMode): void {
+    if (!this.config) return;
+    const wasExpand = this.config.columnResizeMode === 'expand';
+    this.config.columnResizeMode = mode;
+
+    if (wasExpand && mode === 'fit') {
+      // Reset column widths so they fit on screen (expand mode can have very wide columns + scroll)
+      this.columnWidths.clear();
+      this.applyColumnWidthsFromStateOrDefaults();
+      if (this.viewInitialized) {
+        this.applyInitialWidths(); // Uses rAF for fitLastColumnToRemainingWidth
+        // Persist AFTER rAF so last column width is correct (skill: performance)
+        requestAnimationFrame(() => {
+          this.writeTableStateToStorage(this.buildTableState());
+          this.cdr.markForCheck();
+        });
+        return; // Skip immediate persist below
+      }
+    } else if (this.viewInitialized) {
+      if (this.columnResizeMode === 'fit') this.fitLastColumnToRemainingWidth();
+      else if (this.columnResizeMode === 'expand') this.expandModeFillLastColumnIfNoScroll();
+    }
+
+    this.writeTableStateToStorage(this.buildTableState());
+    this.cdr.markForCheck();
   }
 
   // ========== TABLE STATE PERSISTENCE (localStorage) ==========
@@ -409,6 +460,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
         if (id !== 'select') this.columnWidths.set(id, w);
       });
     }
+    if (state.columnResizeMode === 'fit' || state.columnResizeMode === 'expand') {
+      this.config!.columnResizeMode = state.columnResizeMode;
+    }
   }
 
   private buildTableState(): TableState {
@@ -424,6 +478,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       filters: {},
       hiddenColumns: Object.fromEntries(columns.map(c => [c.id, !!c.hidden])),
       stickyColumns: Object.fromEntries(columns.map(c => [c.id, c.sticky]).filter(([, v]) => v !== undefined)),
+      columnResizeMode: this.columnResizeMode,
     };
   }
 
@@ -701,11 +756,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     const cols = this.displayedColumns;
     if (!cols?.length) return '1fr';
     return cols.map((colId) => this.getColWidthStyle(colId)).join(' ');
-  }
-
-  /** Item size in px for CDK virtual scroll (fixed height per row, V1). */
-  get virtualScrollItemSize(): number {
-    return 48;
   }
 
   /** Sort header click (grille unifiée : on met à jour la strategy et on synce MatSort pour attachSort). */

@@ -116,6 +116,9 @@ export interface TableState {
 
   /** Sticky column state (columnId → 'start' | 'end' | boolean) */
   stickyColumns?: Record<string, 'start' | 'end' | boolean>;
+
+  /** Column resize mode (fit | expand) - user preference override */
+  columnResizeMode?: ColumnResizeMode;
 }
 
 /**
@@ -138,6 +141,7 @@ export interface TableStatePatch {
   density?: TableState['density'];
   hiddenColumns?: Partial<Record<string, boolean>>;
   stickyColumns?: Partial<Record<string, 'start' | 'end' | boolean>>;
+  columnResizeMode?: ColumnResizeMode;
 }
 
 /**

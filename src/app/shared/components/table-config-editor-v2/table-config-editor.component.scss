@@ -4,16 +4,59 @@
     display: inline-block;
     vertical-align: top;
 
-    .table-header {
+    .config-toolbar {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
-        margin-top: 10px;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 12px 0 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .config-toolbar__left,
+    .config-toolbar__right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-left: auto; // Aligne à droite quand seul
+    }
+
+    .config-toolbar__title {
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .resize-mode-options {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        &__label {
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.7);
+            white-space: nowrap;
+        }
+
+        &__toggle {
+            // Compact toggle group aligned with toolbar
+            .mat-button-toggle-group,
+            .mat-mdc-button-toggle-group {
+                border-radius: 6px;
+            }
+            // Même bleu primary que le bouton "Ajuster largeurs"
+            .mat-button-toggle-checked,
+            .mat-mdc-button-toggle-button[aria-pressed="true"] {
+                background-color: var(--mat-badge-background-color, #3f51b5);
+                color: #fff;
+            }
+        }
     }
 
     .mat-mdc-mini-fab {
-        border-radius: 5px !important;
+        border-radius: 6px !important;
     }
 
     .toggle-options {

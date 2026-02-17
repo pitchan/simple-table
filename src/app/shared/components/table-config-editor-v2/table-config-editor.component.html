@@ -26,11 +26,26 @@
             </ng-container>
         </p>
     </div>
-    <div class="table-header">
-        <span *ngIf="tableColumnDefaultConfig?.title">{{ tableColumnDefaultConfig?.title | translate }}</span>
-        <button color="primary" (click)="fitWidth()" mat-mini-fab aria-label="fitWidth">
+    <div class="config-toolbar">
+        <div class="config-toolbar__left" *ngIf="hasResizeOption">
+          <section class="resize-mode-options">
+            <span class="resize-mode-options__label">Mode</span>
+            <mat-button-toggle-group
+              class="resize-mode-options__toggle"
+              [value]="columnResizeMode"
+              (change)="onColumnResizeModeChange($event.value)"
+              aria-label="Mode de redimensionnement des colonnes">
+              <mat-button-toggle value="fit" aria-label="Fit - largeur constante">Fit</mat-button-toggle>
+              <mat-button-toggle value="expand" aria-label="Expand - scroll horizontal">Expand</mat-button-toggle>
+            </mat-button-toggle-group>
+          </section>
+        </div>
+        <div class="config-toolbar__right">
+          <span *ngIf="tableColumnDefaultConfig?.title" class="config-toolbar__title">{{ tableColumnDefaultConfig?.title | translate }}</span>
+          <button color="primary" (click)="fitWidth()" mat-mini-fab aria-label="Ajuster largeurs des colonnes">
             <mat-icon>horizontal_distribute</mat-icon>
-        </button>
+          </button>
+        </div>
     </div>
     <div>
         <div cdkDropList [cdkDropListData]="options.columns.columns" [cdkDropListSortPredicate]="sortPredicate"

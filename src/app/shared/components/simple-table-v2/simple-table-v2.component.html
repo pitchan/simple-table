@@ -147,10 +147,13 @@
     <div (click)="$event.stopPropagation()" class="config-menu-wrapper">
       <app-table-config-editor-v2
         [options]="editorOptions"
+        [columnResizeMode]="columnResizeMode"
+        [hasResizeOption]="resizableColumnsEnabled"
         [tableColumnDefaultConfig]="{}"
         [hasLockOption]="true"
         [hasResponsiveOption]="false"
         (onTableColumnChangeEvent)="handleConfigChange($event)"
+        (columnResizeModeChangeEvent)="handleColumnResizeModeChange($event)"
         (autoResizeChangeEvent)="handleAutoResize($event)">
       </app-table-config-editor-v2>
     </div>
