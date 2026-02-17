@@ -219,6 +219,7 @@ $resize-helper-color: #2196f3;
     padding: 0;
     min-width: 24px;
     flex-shrink: 0;
+    position: relative;
 
     .mat-icon {
       font-size: 18px;
@@ -235,6 +236,18 @@ $resize-helper-color: #2196f3;
 
     &:hover .mat-icon {
       opacity: 0.9;
+    }
+
+    &__badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 8px;
+      height: 8px;
+      background-color: var(--primary-color, #1976d2);
+      border-radius: 50%;
+      border: 1px solid white;
+      pointer-events: none;
     }
   }
 }

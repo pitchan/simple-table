@@ -93,6 +93,47 @@ export class TableFilterService<T> {
   }
 
   /**
+   * Apply all active filters EXCEPT one column (for cascading filter lists)
+   * Used to build filter list for column X showing values from rows that pass OTHER columns' filters
+   * 
+   * CRITICAL: Column X's own filter is excluded so unchecked values remain visible for re-checking
+   * Implements table-tree-view logic: !(item.hidden && item.filteredBy != columnName)
+   * 
+   * @param originalData - Original unfiltered data
+   * @param filteredColumnList - Active filters
+   * @param excludeColumnId - Column to exclude from filtering
+   * @param getColumnFn - Function to get column definition
+   * @param getCellValueFn - Function to extract cell value
+   * @param formatDisplayValueFn - Function to format display value
+   * @returns Filtered data array
+   */
+  applyFiltersExcept(
+    originalData: T[],
+    filteredColumnList: FilterEvent[],
+    excludeColumnId: string,
+    getColumnFn: (columnId: string) => TableColumnDef<T> | undefined,
+    getCellValueFn: (row: T, column: TableColumnDef<T>) => any,
+    formatDisplayValueFn: (value: any, column: TableColumnDef<T>) => string
+  ): T[] {
+    let filtered = [...originalData];
+
+    // Apply filters from all columns EXCEPT the excluded one
+    filteredColumnList.forEach(filterEvent => {
+      if (filterEvent.columnName === excludeColumnId) {
+        return; // Skip this column's filter
+      }
+
+      if (filterEvent.eventType === 'checkbox' || filterEvent.eventType === 'search') {
+        filtered = this.filterByCheckbox(filtered, filterEvent, getColumnFn, getCellValueFn, formatDisplayValueFn);
+      } else if (filterEvent.eventType === 'advance') {
+        filtered = this.filterByAdvanced(filtered, filterEvent, getColumnFn, getCellValueFn);
+      }
+    });
+
+    return filtered;
+  }
+
+  /**
    * Apply checkbox filter to data array
    */
   private filterByCheckbox(
@@ -177,6 +218,41 @@ export class TableFilterService<T> {
       default:
         return true;
     }
+  }
+
+  /**
+   * Synchronize a filter list with checkbox changes from a FilterEvent.
+   * Returns the updated list with checked/unchecked state applied.
+   *
+   * @param currentList - Current filter list for the column
+   * @param event - FilterEvent containing newCheckedValues/newUncheckedValues
+   * @param columnId - Column identifier (used for filteredBy)
+   * @returns Updated filter list with checkbox states applied
+   */
+  syncFilterListFromEvent(
+    currentList: FilterList[],
+    event: FilterEvent,
+    columnId: string
+  ): FilterList[] {
+    return currentList.map(item => {
+      const itemKey = String(item.displayValue);
+
+      const wasChecked = event.newCheckedValues?.some(
+        v => String(v.displayValue) === itemKey
+      );
+      const wasUnchecked = event.newUncheckedValues?.some(
+        v => String(v.displayValue) === itemKey
+      );
+
+      if (wasChecked || wasUnchecked) {
+        return {
+          ...item,
+          checked: !!wasChecked,
+          filteredBy: wasChecked ? undefined : columnId,
+        };
+      }
+      return item;
+    });
   }
 
   /**

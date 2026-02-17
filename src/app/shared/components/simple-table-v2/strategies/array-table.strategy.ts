@@ -54,6 +54,14 @@ export class ArrayTableStrategy<T> implements ITableStrategy<T> {
   readonly totalCount = computed(() => this.filteredSortedSig().length);
   readonly loading = computed(() => false);
 
+  /**
+   * Returns the full raw dataset (before pagination)
+   * Used for column filtering to preserve sort order across all pages
+   */
+  getFullDataset(): T[] {
+    return this.rowsSig();
+  }
+
   constructor(
     private destroyRef: DestroyRef,
     private cdr: ChangeDetectorRef,

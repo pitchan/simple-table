@@ -87,6 +87,12 @@ export interface ITableStrategy<T> {
    * Bypasses internal filter pipeline
    */
   setFilteredData?(filteredData: T[]): void;
+
+  /**
+   * Optional: Get full dataset before pagination (for Array strategy)
+   * Used by column filters to access all rows for filtering
+   */
+  getFullDataset?(): T[];
 }
 
 /**

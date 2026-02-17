@@ -41,6 +41,8 @@ import { ITableStrategy } from './models/table-strategy.interface';
 import { TableColumnDef, TableConfig, TableState, DEFAULT_COLUMN_WIDTHS, ColumnResizeMode, SelectionMode } from './models/column-def.model';
 import { ResizableColumnDirective, ResizableColumnEvent } from './directives/resizable-column.directive';
 import { TableResizeService } from './services/table-resize.service';
+import { TableSortService } from './services/table-sort.service';
+import { TableStateService } from './services/table-state.service';
 import { DomHandler } from './helpers/dom-handler';
 import { TableConfigEditorComponentV2 } from './components/table-config-editor-v2/table-config-editor.component';
 import { TableColumnFilterV2Component } from './components/table-column-filter-v2/table-column-filter-v2.component';
@@ -99,7 +101,7 @@ import { PreventMenuCloseDirective } from './directives/prevent-menu-close.direc
     ScrollingModule,
     PreventMenuCloseDirective
   ],
-  providers: [TableResizeService, TableFilterService],
+  providers: [TableResizeService, TableFilterService, TableSortService, TableStateService],
 })
 export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
@@ -108,6 +110,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   private readonly renderer = inject(Renderer2);
   private readonly resizeService = inject(TableResizeService);
   private readonly filterService = inject(TableFilterService<T>);
+  private readonly sortService = inject(TableSortService<T>);
+  private readonly stateService = inject(TableStateService<T>);
 
   /** Flag to track if AfterViewInit has been called */
   private viewInitialized = false;
@@ -261,8 +265,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     this.validateInputs();
     this.syncSelectionState();
     this.ensureSelectionModel();
-    const state = this.readTableStateFromStorage();
-    if (state) this.applyTableStateToConfig(state);
+    const state = this.stateService.read(this.config?.id);
+    if (state) this.stateService.applyToConfig(state, this.config.columns, this.columnWidths, this.config);
     this.initializeColumns();
     this.initializeConfigEditor();
     this.initializeStrategy();
@@ -280,8 +284,8 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
         if (this.debug) {
           console.log('[SimpleTableV2] Config changed, reinitializing columns', changes['config'].currentValue);
         }
-        const state = this.readTableStateFromStorage();
-        if (state) this.applyTableStateToConfig(state);
+        const state = this.stateService.read(this.config?.id);
+        if (state) this.stateService.applyToConfig(state, this.config.columns, this.columnWidths, this.config);
         this.initializeColumns();
         this.initializeConfigEditor();
         if (this.viewInitialized) {
@@ -380,16 +384,16 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       this.applyColumnWidthsFromStateOrDefaults();
     }
     if (this.viewInitialized) this.applyInitialWidths();
-    this.writeTableStateToStorage(this.buildTableState());
+    this.persistState();
     this.cdr.markForCheck();
   }
 
   handleAutoResize(_event: boolean): void {
-    const key = this.getTableStateStorageKey();
+    const key = this.stateService.getStorageKey(this.config?.id);
     if (!key) return;
 
     // Lire l'état actuel (storage ou build depuis config)
-    const currentState = this.readTableStateFromStorage() ?? this.buildTableState();
+    const currentState = this.stateService.read(this.config?.id) ?? this.buildCurrentState();
 
     // Ne modifier que columnWidths : le vider
     const updatedState: TableState = {
@@ -398,7 +402,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     };
 
     // Sauvegarder (conserve order, hidden, sticky, etc.)
-    this.writeTableStateToStorage(updatedState);
+    this.stateService.write(this.config?.id, updatedState);
 
     // En mémoire : reset largeurs et repartir des défauts
     this.columnWidths.clear();
@@ -423,7 +427,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
         this.applyInitialWidths(); // Uses rAF for fitLastColumnToRemainingWidth
         // Persist AFTER rAF so last column width is correct (skill: performance)
         requestAnimationFrame(() => {
-          this.writeTableStateToStorage(this.buildTableState());
+          this.persistState();
           this.cdr.markForCheck();
         });
         return; // Skip immediate persist below
@@ -433,83 +437,24 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       else if (this.columnResizeMode === 'expand') this.expandModeFillLastColumnIfNoScroll();
     }
 
-    this.writeTableStateToStorage(this.buildTableState());
+    this.persistState();
     this.cdr.markForCheck();
   }
 
-  // ========== TABLE STATE PERSISTENCE (localStorage) ==========
-  private getTableStateStorageKey(): string {
-    return `tableState_${this.config?.id ?? ''}`;
+  // ========== TABLE STATE PERSISTENCE (delegated to TableStateService) ==========
+
+  /** Build current state snapshot and persist to localStorage. */
+  private persistState(): void {
+    this.stateService.write(this.config?.id, this.buildCurrentState());
   }
 
-  private readTableStateFromStorage(): TableState | null {
-    const key = this.getTableStateStorageKey();
-    if (!key) return null;
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as TableState;
-      return parsed?.columnOrder ? parsed : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private applyTableStateToConfig(state: TableState): void {
-    if (!this.config?.columns?.length) return;
-    const order = state.columnOrder;
-    if (order?.length) {
-      const byId = new Map(this.config.columns.map(c => [c.id, c]));
-      const ordered: TableColumnDef<T>[] = [];
-      for (const id of order) {
-        const col = byId.get(id);
-        if (col) ordered.push(col);
-      }
-      for (const col of this.config.columns) {
-        if (!order.includes(col.id)) ordered.push(col);
-      }
-      this.config.columns.length = 0;
-      this.config.columns.push(...ordered);
-    }
-    this.config.columns.forEach(col => {
-      if (state.hiddenColumns && col.id in state.hiddenColumns) col.hidden = state.hiddenColumns[col.id];
-      if (state.stickyColumns && col.id in state.stickyColumns) col.sticky = state.stickyColumns[col.id];
-    });
-    if (state.columnWidths && typeof state.columnWidths === 'object') {
-      Object.entries(state.columnWidths).forEach(([id, w]) => {
-        if (id !== 'select') this.columnWidths.set(id, w);
-      });
-    }
-    if (state.columnResizeMode === 'fit' || state.columnResizeMode === 'expand') {
-      this.config!.columnResizeMode = state.columnResizeMode;
-    }
-  }
-
-  private buildTableState(): TableState {
-    const columns = this.config?.columns ?? [];
-    const columnWidths: Record<string, number> = {};
-    this.columnWidths.forEach((w, id) => {
-        if (id !== 'select') columnWidths[id] = w;
-    });
-    return {
-      columnOrder: columns.map(c => c.id),
-      columnWidths,
-      sort: { active: '', direction: '' },
-      filters: {},
-      hiddenColumns: Object.fromEntries(columns.map(c => [c.id, !!c.hidden])),
-      stickyColumns: Object.fromEntries(columns.map(c => [c.id, c.sticky]).filter(([, v]) => v !== undefined)),
-      columnResizeMode: this.columnResizeMode,
-    };
-  }
-
-  private writeTableStateToStorage(state: TableState): void {
-    const key = this.getTableStateStorageKey();
-    if (!key) return;
-    try {
-      localStorage.setItem(key, JSON.stringify(state));
-    } catch {
-      // ignore quota / private mode
-    }
+  /** Build a TableState from current runtime values (delegates to service). */
+  private buildCurrentState(): TableState {
+    return this.stateService.buildState(
+      this.config?.columns ?? [],
+      this.columnWidths,
+      this.columnResizeMode
+    );
   }
 
   // ========== INITIALIZATION ==========
@@ -566,7 +511,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       this.cdr,
       {
         debug: this.debug,
-        sortingDataAccessor: this.customSortingAccessor.bind(this),
+        sortingDataAccessor: this.sortService.createSortingAccessor(
+          () => this.config?.columns ?? []
+        ),
         globalFilterAdapter: this.config?.globalFilterAdapter,
         filterApply: this.config?.filterApply,
       }
@@ -616,7 +563,9 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     } else {
       // For strategies without connect (like ArrayTableStrategy), save data immediately
       setTimeout(() => {
-        const currentData = this.tableData();
+        // Get full dataset from strategy (before pagination) for accurate filtering
+        const strategy = this.strategy;
+        const currentData = strategy?.getFullDataset ? strategy.getFullDataset() : this.tableData();
         if (currentData && currentData.length > 0 && this.filteredColumnList.length === 0) {
           this.cloneTableData = [...currentData];
           if (this.debug) {
@@ -664,19 +613,41 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   }
 
   /**
-   * Build filter list for a specific column (unique values from ORIGINAL data)
-   * IMPORTANT: Always uses cloneTableData to keep all values visible even when unchecked
-   * Adapted from TableTreeView.viewFilter()
+   * Build filter list for a specific column with cascading support
+   * - Cascading logic:
+   * - Current column: Shows ALL values (including unchecked) so user can re-check them
+   * - Other columns: Show only values from rows passing OTHER filters (cascade effect)
+   * 
+   * 
+   * @param columnId - Column to build filter list for
+   * @param isReset - If true, uses cloneTableData (all data); if false, applies cascading
+   * @returns Array of FilterList items with unique values
    */
   private viewFilter(columnId: string, isReset = false): Array<FilterList> {
     const column = this.getColumn(columnId);
     if (!column) return [];
 
-    // CRITICAL FIX: Always use cloneTableData (original unfiltered data)
-    // NOT tableData() which is already filtered - this would hide unchecked items!
-    const originalData = this.cloneTableData;
-    if (!originalData || originalData.length === 0) {
-      console.warn('[SimpleTableV2] No original data for filtering, using current data');
+    let sourceData: T[];
+
+    if (isReset) {
+      // Reset: Show all values from original data
+      sourceData = this.cloneTableData;
+    } else {
+      // CASCADING: Apply all filters EXCEPT current column
+      // This ensures current column shows its own unchecked values (for re-checking)
+      // while other columns only show values from currently visible rows
+      sourceData = this.filterService.applyFiltersExcept(
+        this.cloneTableData,
+        this.filteredColumnList,
+        columnId,
+        (colId) => this.getColumn(colId),
+        (row, col) => this.getCellValue(row, col),
+        (value, col) => this.filterService.formatDisplayValue(value, col)
+      );
+    }
+    
+    if (!sourceData || sourceData.length === 0) {
+      console.warn('[SimpleTableV2] No data available for filtering');
       return [];
     }
 
@@ -687,7 +658,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     const filterList = this.filterService.buildFilterList(
       columnId,
       column,
-      originalData,
+      sourceData,
       (row, col) => this.getCellValue(row, col),
       (value, col) => this.filterService.formatDisplayValue(value, col),
       existingFilterEvent
@@ -718,6 +689,12 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       return;
     }
 
+    // If all items are selected, treat it as a reset (no active filter)
+    if (event.isAllSelected === true) {
+      this.handleResetFilter(columnId);
+      return;
+    }
+
     // Update filteredColumnList
     const existingIndex = this.filteredColumnList.findIndex(f => f.columnName === columnId);
     if (existingIndex >= 0) {
@@ -726,13 +703,42 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       this.filteredColumnList.push(event);
     }
 
+    // Sync Map immediately to keep it as source of truth
+    this.updateColumnFilterMapFromEvent(columnId, event);
+
     // Mark column as filtered
     this.filteredColumns[columnId] = true;
 
     // Apply all filters
     this.applyAllFilters();
     
+    // CASCADING UPDATE: Rebuild filter lists for ALL other columns to reflect new filtered data
+    this.filteredColumnList.forEach(filter => {
+      if (filter.columnName !== columnId) {
+        this.viewFilter(filter.columnName, false);
+      }
+    });
+    
     this.cdr.markForCheck();
+  }
+
+  /**
+   * Synchronize columnFilterListMap with filter event changes.
+   * Delegates filter logic to TableFilterService (SRP).
+   */
+  private updateColumnFilterMapFromEvent(columnId: string, event: FilterEvent): void {
+    const currentList = this.columnFilterListMap().get(columnId);
+    if (!currentList || currentList.length === 0) {
+      return;
+    }
+
+    const updatedList = this.filterService.syncFilterListFromEvent(currentList, event, columnId);
+
+    this.columnFilterListMap.update(map => {
+      const newMap = new Map(map);
+      newMap.set(columnId, updatedList);
+      return newMap;
+    });
   }
 
   /**
@@ -836,57 +842,6 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   private getDefaultWidthForType(type: string): number {
     const widthConfig = DEFAULT_COLUMN_WIDTHS[type as keyof typeof DEFAULT_COLUMN_WIDTHS];
     return widthConfig ? widthConfig.initial : DEFAULT_COLUMN_WIDTHS['text'].initial;
-  }
-
-  private customSortingAccessor(item: T, columnId: string): string | number {
-    const column = this.config.columns.find(c => c.id === columnId);
-    
-    // Use column's sortAccessor if provided
-    if (column?.sortAccessor) {
-      const value = column.sortAccessor(item);
-      // Convert Date to number for sorting
-      if (value instanceof Date) {
-        return value.getTime();
-      }
-      return value;
-    }
-
-    // Use column's accessor if provided
-    if (column?.accessor) {
-      const value = column.accessor(item);
-      return this.normalizeValueForSort(value, columnId);
-    }
-
-    // Fallback to property access
-    const value = (item as Record<string, unknown>)[columnId];
-    return this.normalizeValueForSort(value, columnId);
-  }
-
-  private normalizeValueForSort(value: any, columnId: string): string | number {
-    if (value == null) return '';
-    
-    if (value instanceof Date) return value.getTime();
-    
-    if (typeof value === 'string' && columnId.toLowerCase().includes('date')) {
-      const parsed = Date.parse(value);
-      if (!isNaN(parsed)) return parsed;
-    }
-    
-    if (typeof value === 'object' && 'code' in value) {
-      return String(value.code).toLowerCase();
-    }
-    
-    if (Array.isArray(value) && value.length > 0) {
-      const first = value[0];
-      if (typeof first === 'object' && 'code' in first) {
-        return String(first.code).toLowerCase();
-      }
-      return String(first).toLowerCase();
-    }
-    
-    if (typeof value === 'string') return value.trim().toLowerCase();
-    
-    return value as string | number;
   }
 
   getColumn(columnId: string): TableColumnDef<T> | undefined {
@@ -1193,7 +1148,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       const byColId = this.resizeService.getColumnWidthsByColId();
       Object.entries(byColId).forEach(([id, w]) => this.columnWidths.set(id, w));
       this.columnWidths.set(resizeResult.columnId, resizeResult.width);
-      this.writeTableStateToStorage(this.buildTableState());
+      this.persistState();
       if (this.debug) console.log('[SimpleTableV2] Resize end:', resizeResult);
     }
 

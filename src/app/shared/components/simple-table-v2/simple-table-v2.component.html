@@ -83,6 +83,7 @@
                   [matTooltip]="'COMMON.BUTTON_FILTER' | translate"
                   matTooltipPosition="above">
             <mat-icon [ngClass]="{'view-icon': filteredColumns[column.id]}">filter_list</mat-icon>
+            <span *ngIf="filteredColumns[column.id]" class="filter-button__badge" aria-label="Filtre actif"></span>
           </button>
           
           <mat-menu #columnFilter="matMenu" backdropClass="table-column-filter" (click)="$event.stopPropagation()">
