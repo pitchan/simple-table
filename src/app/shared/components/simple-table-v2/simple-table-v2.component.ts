@@ -21,7 +21,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { tap } from 'rxjs';
+import { fromEvent, tap } from 'rxjs';
 import { CommonModule, JsonPipe } from '@angular/common';
 import { MatSort, MatSortModule, Sort } from '@angular/material/sort';
 import { MatPaginator, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -107,6 +107,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly destroyRef = inject(DestroyRef);
   private readonly elementRef = inject(ElementRef);
+  private readonly ngZone = inject(NgZone);
   private readonly renderer = inject(Renderer2);
   private readonly resizeService = inject(TableResizeService);
   private readonly filterService = inject(TableFilterService<T>);
@@ -334,6 +335,7 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
     this.applyInitialWidths();
 
     this.setupContainerResizeObserverForFitLastColumn();
+    this.setupStickyScrollListener();
 
     this.cdr.markForCheck();
 
@@ -352,6 +354,27 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
       else if (this.columnResizeMode === 'expand') this.expandModeFillLastColumnIfNoScroll();
     });
     this.resizeObserver.observe(container);
+  }
+
+  /**
+   * Listen to horizontal scroll on .table-wrapper and update --sticky-offset CSS variable.
+   * Sticky cells use transform: translateX(var(--sticky-offset)) to stay visually pinned.
+   * Runs outside NgZone to avoid triggering change detection on every scroll frame.
+   */
+  private setupStickyScrollListener(): void {
+    const wrapper = this.elementRef.nativeElement.querySelector('.table-wrapper') as HTMLElement;
+    if (!wrapper) return;
+
+    this.ngZone.runOutsideAngular(() => {
+      fromEvent(wrapper, 'scroll', { passive: true }).pipe(
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe(() => {
+        const container = this.getWrapper();
+        if (container) {
+          container.style.setProperty('--sticky-offset', `${wrapper.scrollLeft}px`);
+        }
+      });
+    });
   }
 
   // ========== CONFIG EDITOR ==========
@@ -846,6 +869,12 @@ export class SimpleTableV2Component<T> implements OnInit, OnChanges, AfterViewIn
 
   getColumn(columnId: string): TableColumnDef<T> | undefined {
     return this.config?.columns?.find(c => c.id === columnId);
+  }
+
+  /** True if this column is the last sticky column (used for shadow separator). */
+  isLastStickyColumn(column: TableColumnDef<T>): boolean {
+    const stickyColumns = this.visibleColumns.filter(c => c.sticky === true || c.sticky === 'start');
+    return stickyColumns.length > 0 && stickyColumns[stickyColumns.length - 1].id === column.id;
   }
 
   getColumnHeader(column: TableColumnDef<T>): string {

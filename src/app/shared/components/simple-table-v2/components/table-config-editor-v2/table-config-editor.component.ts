@@ -78,7 +78,23 @@ export class TableConfigEditorComponentV2 {
 
   toggleSticky(event: Event, column: any): void {
     event.stopPropagation();
-    column.sticky = !column.sticky;
+    const columns: any[] = this.options.columns.columns;
+    const index = columns.indexOf(column);
+    const newSticky = !column.sticky;
+
+    if (newSticky) {
+      // Rendre sticky toutes les colonnes visibles de 0 à index
+      for (let i = 0; i <= index; i++) {
+        if (!columns[i].hidden) {
+          columns[i].sticky = true;
+        }
+      }
+    } else {
+      // Retirer sticky de la colonne et de toutes les suivantes
+      for (let i = index; i < columns.length; i++) {
+        columns[i].sticky = false;
+      }
+    }
     this.emitChange();
   }
 

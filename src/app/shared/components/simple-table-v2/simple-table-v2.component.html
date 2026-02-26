@@ -59,7 +59,7 @@
              role="columnheader"
              [attr.data-column]="column.id"
              [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
-             [style.left]="(column.sticky === true || column.sticky === 'start') ? getColLeftStyle(column.id) : null"
+             [class.sticky-column--last]="isLastStickyColumn(column)"
              [class.p-resizable-column]="resizableColumnsEnabled && column.resizable !== false && !(colIndex === visibleColumns.length - 1 && columnResizeMode === 'fit')"
              pResizableColumn
              [pResizableColumnDisabled]="!resizableColumnsEnabled || column.resizable === false || (colIndex === visibleColumns.length - 1 && columnResizeMode === 'fit')"
@@ -137,7 +137,7 @@
            class="grid-cell cell-content-wrapper"
            role="gridcell"
            [class.sticky-column]="column.sticky === true || column.sticky === 'start'"
-           [style.left]="(column.sticky === true || column.sticky === 'start') ? getColLeftStyle(column.id) : null"
+           [class.sticky-column--last]="isLastStickyColumn(column)"
            [matTooltip]="column.tooltip ? getCellValue(row, column) : ''"
            [matTooltipDisabled]="!column.tooltip">
         <ng-container *ngIf="!column.type || column.type === 'text' || column.type === 'date' || column.type === 'number' || column.type === 'badge'">

@@ -343,11 +343,13 @@ cdk-virtual-scroll-viewport.cdk-virtual-scrollable {
   }
 }
 
-// Sticky columns en mode grid (même rendu que mat-table)
+// Sticky columns — approche transform (compatible virtual scroll + overflow:hidden)
+// Le scroll listener met à jour --sticky-offset sur le conteneur.
+// Les cellules sticky se décalent visuellement via translateX pour rester figées.
 .grid-header-cell.sticky-column,
 .grid-cell.sticky-column {
-  position: sticky;
-  z-index: 1;
+  transform: translateX(var(--sticky-offset, 0px));
+  z-index: 2;
   background: inherit;
 }
 .grid-header-cell.sticky-column {
@@ -362,6 +364,12 @@ cdk-virtual-scroll-viewport.cdk-virtual-scrollable {
 }
 .grid-row.selected .grid-cell.sticky-column {
   background: rgba(33, 150, 243, 0.1);
+}
+
+// Shadow séparatrice sur la dernière colonne sticky
+.grid-header-cell.sticky-column--last,
+.grid-cell.sticky-column--last {
+  box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.15);
 }
 
 .grid-header-cell.sticky-column-end,
