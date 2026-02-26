@@ -5,7 +5,7 @@
       <mat-icon matPrefix>search</mat-icon>
       <input
         matInput
-        [formControl]="customFilter.get('searchFilter')"
+        [formControl]="searchFilterControl"
         placeholder="Search..."
         (keyup.enter)="onEnterChange()"
       />

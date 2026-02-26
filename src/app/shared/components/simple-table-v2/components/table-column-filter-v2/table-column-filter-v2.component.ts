@@ -15,7 +15,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxChange, MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -27,9 +27,9 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { cloneDeep, uniqBy } from 'lodash-es';
-import { COLUMN_DATA_TYPE, TABLE_FILTER_OPERATOR_LIST } from 'src/app/core/constants/constants';
-import { LocalizedDatePipe } from 'src/app/shared/pipes/translation/localized-date.pipe';
+import { COLUMN_DATA_TYPE, TABLE_FILTER_OPERATOR_LIST } from '../../models/filter-constants';
 import { FilterEvent, FilterList, FilterOperator } from '../../models/filter.model';
+import { LocalizedDatePipe } from '../../pipes/localized-date.pipe';
 
 /**
  * TableColumnFilterV2Component - Generic column filter (No TreeView, No Business Logic)
@@ -80,14 +80,14 @@ export class TableColumnFilterV2Component implements OnChanges {
 
   // Inputs
   @Input() filterListMap: Map<string, FilterList[]> = new Map();
-  @Input() columnName: string;
+  @Input() columnName!: string;
   @Input() filteredColumnList: FilterEvent[] = [];
 
   // Outputs
   @Output() filteredEvents = new EventEmitter<FilterEvent>(true);
   @Output() resetCustomFilterEvent = new EventEmitter<void>();
 
-  @ViewChild(MatMenuTrigger) trigger: MatMenuTrigger;
+  @ViewChild(MatMenuTrigger) trigger!: MatMenuTrigger;
 
   // Signals for reactive state
   filterList = signal<FilterList[]>([]);
@@ -109,10 +109,11 @@ export class TableColumnFilterV2Component implements OnChanges {
   });
 
   // Form
+  searchFilterControl = new FormControl<string | null>(null);
   customFilter: FormGroup;
   operatorList: FilterOperator[] = TABLE_FILTER_OPERATOR_LIST as FilterOperator[];
   filteredOperatorList: FilterOperator[] = TABLE_FILTER_OPERATOR_LIST as FilterOperator[];
-  isColumnDataType: string;
+  isColumnDataType: string = '';
 
   // Tracking new checked/unchecked for performance
   private newCheckedValues: FilterList[] = [];
@@ -120,7 +121,7 @@ export class TableColumnFilterV2Component implements OnChanges {
 
   constructor() {
     this.customFilter = this.formBuilder.group({
-      searchFilter: [null],
+      searchFilter: this.searchFilterControl,
       operatorType: ['OR'],
       advanceFilterType1: this.formBuilder.group({
         operatorType1: ['contains'],
@@ -133,26 +134,25 @@ export class TableColumnFilterV2Component implements OnChanges {
     });
 
     // Search filter with debounce
-    this.customFilter
-      .get('searchFilter')!
-      .valueChanges.pipe(
+    this.searchFilterControl.valueChanges
+      .pipe(
         debounceTime(200),
         distinctUntilChanged(),
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe((value) => {
-        this.onSearchChange(value);
+        this.onSearchChange(value ?? '');
       });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes?.filterListMap?.currentValue) {
-      const newFilterList = cloneDeep(
-        changes.filterListMap.currentValue.get(this.columnName) || []
+    if (changes['filterListMap']?.currentValue) {
+      const newFilterList: FilterList[] = cloneDeep(
+        changes['filterListMap'].currentValue.get(this.columnName) || []
       );
-      
+
       // Sort numerically if applicable
-      const sortedList = newFilterList.sort((a, b) => 
+      const sortedList = newFilterList.sort((a: FilterList, b: FilterList) =>
         Number(a.value) - Number(b.value)
       );
 
@@ -263,7 +263,7 @@ export class TableColumnFilterV2Component implements OnChanges {
    * Handle Enter key on search
    */
   onEnterChange(): void {
-    const searchValue = this.customFilter.get('searchFilter')!.value;
+    const searchValue = this.searchFilterControl.value;
 
     if (!searchValue || searchValue.length === 0) {
       const updated = this.filterList().map((item) => {
@@ -342,7 +342,7 @@ export class TableColumnFilterV2Component implements OnChanges {
     }
 
     // Text/Number filtering
-    this.customFilter.get('searchFilter')!.patchValue(null);
+    this.searchFilterControl.patchValue(null);
 
     const hasInput1 = this.customFilter.value?.advanceFilterType1?.searchInput1;
     const hasInput2 = this.customFilter.value?.advanceFilterType2?.searchInput2;
@@ -629,7 +629,7 @@ export class TableColumnFilterV2Component implements OnChanges {
    * Restore search filter if present
    */
   private filterDataByInput(): void {
-    const searchValue = this.customFilter.get('searchFilter')!.value;
+    const searchValue = this.searchFilterControl.value;
     if (searchValue) {
       this.onSearchChange(searchValue);
     }
