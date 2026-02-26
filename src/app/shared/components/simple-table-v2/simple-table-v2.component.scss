@@ -165,6 +165,7 @@ $resize-helper-color: #2196f3;
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 16px;
+  height: 100%;
   position: relative;
   display: flex;
   align-items: center;
@@ -314,6 +315,9 @@ cdk-virtual-scroll-viewport.cdk-virtual-scrollable {
   text-overflow: ellipsis;
   padding: 0 16px;
   box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  align-items: center;
 
   &.grid-cell--select,
   &.grid-cell--config {
